@@ -1,0 +1,5 @@
+opencv-python==4.8.1.78
+numpy==1.26.4
+mss==9.0.1
+ultralytics==8.2.45
+PyQt5==5.15.10
