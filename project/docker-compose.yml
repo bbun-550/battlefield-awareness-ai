@@ -1,37 +1,15 @@
 version: "3.9"
 
 services:
-  # ---------------------------
-  # YOLO 추론 서버
-  # ---------------------------
-  yolo:
-    build: ./yolo_server
-    container_name: yolo_server
-    ports:
-      - "8080:8080"   # 외부 접근용
-    networks:
-      - ai_net
-    restart: always
-
-  # ---------------------------
-  # Flask 자율주행 서버
-  # ---------------------------
   flask:
     build: ./flask_server
     container_name: flask_server
     ports:
       - "5000:5000"
-    depends_on:
-      - yolo            # yolo 컨테이너 먼저 실행
-    environment:
-      YOLO_URL: "http://yolo:8080/predict"   # 내부 네트워크 주소
     networks:
       - ai_net
     restart: always
 
-# ---------------------------
-# 공용 네트워크 설정
-# ---------------------------
 networks:
   ai_net:
     driver: bridge

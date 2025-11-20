@@ -380,7 +380,7 @@ class ScreenDetector:
             pass
 
 if __name__ == "__main__":
-    MODEL_FILE_PATH = 'project/detector_gui/weights/5cls_v5_2_case2_best.pt' 
+    MODEL_FILE_PATH = 'detector_gui/weights/5cls_v5_2_case2_best.pt' 
     detector = ScreenDetector(model_path=MODEL_FILE_PATH)
     detector.run_detection()
 
