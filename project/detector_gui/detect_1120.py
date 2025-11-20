@@ -74,7 +74,7 @@ class ScreenDetector:
         
         self.MAX_DRAW_DISTANCE_M = 200.0 
         
-        self.TARGET_FILE_PATH = r'C:\test\tankchallenge\s5.map'
+        self.TARGET_FILE_PATH = 'weights/s5.map'
         self.player_pos = [0.0, 0.0, 0.0] 
         self.map_data_cache = self.load_target_coordinates()
         
