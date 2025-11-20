@@ -47,11 +47,25 @@ class ScreenDetector:
         self.player_pos = [0.0, 0.0, 0.0]
         
         # 화면 해상도 설정 (기본 FHD)
-        self.screen_width = 1920
-        self.screen_height = 1080
-
-        self.monitor = {"top": 0, "left": 0, "width": self.screen_width, "height": self.screen_height}
+        self.screen_width = 3840    # 1920
+        self.screen_height = 2160    # 1080
+        
+        # ======================
         self.sct = mss()
+        mon = self.sct.monitors[1]   # 실제 물리 모니터
+
+        self.screen_width = mon["width"]
+        self.screen_height = mon["height"]
+
+        self.monitor = {
+            "top": mon["top"],
+            "left": mon["left"],
+            "width": mon["width"],
+            "height": mon["height"]
+        }        
+        # self.monitor = {"top": 0, "left": 0, "width": self.screen_width, "height": self.screen_height}
+        # self.sct = mss()
+        # ========================
 
         base_path = os.path.dirname(os.path.abspath(__file__))
         full_model_path = os.path.join(base_path, model_path)
@@ -265,9 +279,17 @@ class ScreenDetector:
 
                 # 2. 텍스트 및 HUD 그리기 (PIL)
                 if self.font_bold is not None:
+                    # OpenCV BGR -> PIL RGB 변환
                     img_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-                    draw = ImageDraw.Draw(img_pil)
                     
+                    # 투명도 처리를 위해 RGBA 모드로 변환
+                    img_pil = img_pil.convert("RGBA")
+                    
+                    # 투명 레이어 생성 (여기다가 반투명 박스 그림)
+                    overlay = Image.new('RGBA', img_pil.size, (0, 0, 0, 0))
+                    draw = ImageDraw.Draw(overlay)
+                    
+                    # 객체 라벨링 (이전과 동일)
                     current_frame_boxes.sort(key=lambda x: x['sim_dist'])
                     counters = {} 
 
@@ -287,67 +309,77 @@ class ScreenDetector:
                         if map_obj:
                             real_d = map_obj['real_dist']
                             label_name = simple_name
-                            label_dist = f"측정거리 : {real_d:.1f}m"
+                            label_dist = f"R : {real_d:.1f}m"
                             
-                            # HUD 리스트용 (이름 + 거리)
                             id_str = f"{simple_name} : {real_d:.1f}m"
                             if id_str not in hud_text_list:
                                 hud_text_list.append(id_str)
 
-                            # 이름 (상단)
+                            # 이름
                             draw.text((x1, y1-25), label_name, font=self.font_bold, fill=name_color_rgb)
                             
-                            # 거리 (하단, 배경 포함)
+                            # 거리 배경 및 텍스트
                             text_bbox = draw.textbbox((x1, y2 + 5), label_dist, font=self.font_bold)
-                            draw.rectangle(text_bbox, fill=(200, 200, 200)) 
+                            # draw.rectangle(text_bbox, fill=(200, 200, 200)) 
                             draw.text((x1, y2 + 5), label_dist, font=self.font_bold, fill=(0, 0, 0))
                         else:
                             label = f"{simple_name} (추정:{box['sim_dist']:.1f}m)"
                             draw.text((x1, y1-25), label, font=self.font_bold, fill=(180, 180, 180))
                     
-                    # --- HUD 그리기 (자동 크기 조절 + 총합 표시) ---
-                    hud_text_list.sort()
-                    display_list = hud_text_list[:20] # 최대 20줄까지만 표시
+                    # --- HUD 그리기 (투명도 70% 적용 & 위치 이동) ---
                     
-                    # 총합 텍스트 생성 (가로 나열)
-                    # 예: Car: 3개 | Rock: 1개
+                    hud_text_list.sort()
+                    display_list = hud_text_list[:20] 
+                    
                     summary_text = " | ".join([f"{k.capitalize()}: {v}개" for k, v in total_counts.items()])
                     
-                    # 박스 크기 계산
-                    line_height = 25
-                    header_height = 45 # "내 위치" 포함 여백
+                    # 위치 조정 (y=10 -> y=50)
+                    base_x = 10
+                    base_y = 50  
+                    
+                    line_height = 20
+                    header_gap = 40   
                     list_height = len(display_list) * line_height
-                    summary_height = 35 # 총합 텍스트 공간
+                    summary_height = 40
                     
-                    total_box_height = header_height + list_height + summary_height
+                    total_box_height = header_gap + list_height + summary_height
                     
-                    # 너비 자동 조절 (가장 긴 텍스트 기준)
-                    max_text_width = 300 # 최소 너비
-                    # 리스트 내용물 길이 체크
+                    max_text_width = 300 
                     for txt in display_list:
                         w = draw.textlength(txt, font=self.font_bold)
                         if w > max_text_width: max_text_width = int(w)
-                    # 총합 텍스트 길이 체크
                     w_sum = draw.textlength(summary_text, font=self.font_bold)
                     if w_sum > max_text_width: max_text_width = int(w_sum)
                     
-                    box_width = max_text_width + 40 # 여백 추가
+                    box_width = max_text_width + 40 
                     
-                    # 배경 박스
-                    draw.rectangle([(10, 10), (10 + box_width, 10 + total_box_height)], fill=(0,0,0))
+                    # [수정] 반투명 검정 박스 (Alpha 180 ≈ 70%)
+                    # (R, G, B, Alpha) -> (0, 0, 0, 180)
+                    draw.rectangle(
+                        [(base_x, base_y), (base_x + box_width, base_y + total_box_height)], 
+                        fill=(0, 0, 0, 180) 
+                    )
+                    
+                    # 텍스트 그리기 (텍스트는 불투명)
+                    text_start_x = base_x + 10
+                    text_start_y = base_y + 5
                     
                     # 1. 내 위치
-                    draw.text((20, 15), f"내 위치: {self.player_pos[0]:.1f}, {self.player_pos[2]:.1f}", font=self.font_bold, fill=(0, 255, 0))
+                    draw.text((text_start_x, text_start_y), f"내 위치: {self.player_pos[0]:.1f}, {self.player_pos[2]:.1f}", font=self.font_bold, fill=(0, 255, 0))
                     
                     # 2. 리스트
                     for i, txt in enumerate(display_list):
-                        draw.text((20, 45 + i*line_height), txt, font=self.font_bold, fill=(200, 200, 200))
+                        draw.text((text_start_x, text_start_y + header_gap + i*line_height), txt, font=self.font_bold, fill=(200, 200, 200))
                     
-                    # 3. 총합 (노란색)
-                    sum_y = 45 + list_height + 5
-                    draw.text((20, sum_y), summary_text, font=self.font_bold, fill=(255, 255, 0))
+                    # 3. 총합
+                    sum_y = text_start_y + header_gap + list_height + 10
+                    draw.text((text_start_x, sum_y), summary_text, font=self.font_bold, fill=(255, 255, 0))
                     
-                    frame = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
+                    # [합성] 원본 이미지와 반투명 오버레이 합성
+                    out = Image.alpha_composite(img_pil, overlay)
+                    
+                    # 다시 OpenCV 포맷으로 변환 (RGBA -> RGB -> BGR)
+                    frame = cv2.cvtColor(np.array(out.convert('RGB')), cv2.COLOR_RGB2BGR)
                 
                 cv2.imshow("Smart Map ID Tracker", frame)
                 if cv2.waitKey(1) & 0xFF == ord('q'): break
