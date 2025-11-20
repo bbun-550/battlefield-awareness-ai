@@ -6,7 +6,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY server_D_1107.py .
+COPY server_D_1110.py .
 
 EXPOSE 5000
 CMD ["python", "server_D_1110.py"]
