@@ -11,18 +11,18 @@ from flask import Flask, request, jsonify
 import math, os, time, json
 import numpy as np
 import pandas as pd
-from ultralytics import YOLO
+# from ultralytics import YOLO
 
 # ------------------------------------------------------------
 # 기본 설정
 # ------------------------------------------------------------
 app = Flask(__name__)
-model = YOLO('5cls_v6_case2_best.pt')
+# model = YOLO('5cls_v6_case2_best.pt')
 
 # log / csv / map 파일 경로
-LOG_FILE    = r"C:\Users\cheei\Documents\Tank Challenge\log_data\tank_info_log.txt"
-OUTPUT_CSV  = r"C:\Users\cheei\Documents\Tank Challenge\log_data\output.csv"
-MAP_FILE    = r"11_20.map"
+LOG_FILE    = r"C:\Users\acorn\Documents\Tank Challenge\log_data\tank_info_log.txt"
+OUTPUT_CSV  = r"C:\Users\acorn\Documents\Tank Challenge\log_data\output.csv"
+MAP_FILE    = "flask_server/map/11_20.map"
 
 # ------------------------------------------------------------
 # WAYPOINT 목록
@@ -439,28 +439,55 @@ def update_bullet():
 # ------------------------------------------------------------
 # 기타 API
 # ------------------------------------------------------------
-@app.route('/detect', methods=['POST'])
-def detect():
-    image = request.files.get('image')
-    if not image: return jsonify({"error": "No image"}), 400
-    image.save('temp_image.jpg')
-    results = model('temp_image.jpg')
-    detections = results[0].boxes.data.cpu().numpy()
-    target_classes = {0: "RED", 1: "Car", 2: "Blue", 3: "Rock", 4: "Tank"}
-    filtered_results = []
-    for box in detections:
-        cid = int(box[5])
-        if cid in target_classes:
-            filtered_results.append({
-                'className': target_classes[cid],
-                'bbox': [float(c) for c in box[:4]],
-                'confidence': float(box[4])
-            })
-    return jsonify(filtered_results)
+# @app.route('/detect', methods=['POST'])
+# def detect():
+#     image = request.files.get('image')
+#     if not image: return jsonify({"error": "No image"}), 400
+#     image.save('temp_image.jpg')
+#     results = model('temp_image.jpg')
+#     detections = results[0].boxes.data.cpu().numpy()
+#     target_classes = {0: "RED", 1: "Car", 2: "Blue", 3: "Rock", 4: "Tank"}
+#     filtered_results = []
+#     for box in detections:
+#         cid = int(box[5])
+#         if cid in target_classes:
+#             filtered_results.append({
+#                 'className': target_classes[cid],
+#                 'bbox': [float(c) for c in box[:4]],
+#                 'confidence': float(box[4])
+#             })
+#     return jsonify(filtered_results)
 
 @app.route('/info', methods=['POST'])
 def info():
-    return jsonify({"status": "success"})
+    """
+    게임에서 POST 요청으로 보내준 플레이어 좌표(x, y, z)를 수신하여
+    탐지기 인스턴스의 player_pos 변수에 업데이트함.
+    """
+    global detector_instance
+    if detector_instance is None:
+        return "Detector not ready", 503
+
+    try:
+        # JSON 데이터 파싱
+        data = request.get_json(force=True)
+        player_pos_data = data.get('playerPos', {})
+        
+        x = float(player_pos_data.get('x', 0.0))
+        y = float(player_pos_data.get('y', 0.0))
+        z = float(player_pos_data.get('z', 0.0)) 
+
+        # 좌표 업데이트
+        detector_instance.player_pos = [x, y, z] 
+        
+        return "OK", 200
+    except Exception as e:
+        print(f"Data Error: {e}")
+        return "Error", 400
+
+# @app.route('/info', methods=['POST'])
+# def info():
+#     return jsonify({"status": "success"})
 
 @app.route('/update_obstacle', methods=['POST'])
 def update_obstacle():
@@ -474,7 +501,7 @@ def collision():
 def init():
     config = {
         "startMode": "start",
-        "blStartX": 5,
+        "blStartX": 15,
         "blStartY": 10,
         "blStartZ": 5,
         "trackingMode": True,

@@ -47,24 +47,24 @@ class ScreenDetector:
         self.player_pos = [0.0, 0.0, 0.0]
         
         # 화면 해상도 설정 (기본 FHD)
-        self.screen_width = 3840    # 1920
-        self.screen_height = 2160    # 1080
+        self.screen_width = 1920
+        self.screen_height = 1080
         
         # ======================
-        self.sct = mss()
-        mon = self.sct.monitors[1]   # 실제 물리 모니터
-
-        self.screen_width = mon["width"]
-        self.screen_height = mon["height"]
-
-        self.monitor = {
-            "top": mon["top"],
-            "left": mon["left"],
-            "width": mon["width"],
-            "height": mon["height"]
-        }        
-        # self.monitor = {"top": 0, "left": 0, "width": self.screen_width, "height": self.screen_height}
         # self.sct = mss()
+        # mon = self.sct.monitors[1]   # 실제 물리 모니터
+
+        # self.screen_width = mon["width"]
+        # self.screen_height = mon["height"]
+
+        # self.monitor = {
+        #     "top": mon["top"],
+        #     "left": mon["left"],
+        #     "width": mon["width"],
+        #     "height": mon["height"]
+        # }        
+        self.monitor = {"top": 0, "left": 0, "width": self.screen_width, "height": self.screen_height}
+        self.sct = mss()
         # ========================
 
         base_path = os.path.dirname(os.path.abspath(__file__))
@@ -88,7 +88,7 @@ class ScreenDetector:
         
         self.MAX_DRAW_DISTANCE_M = 200.0 
         
-        self.TARGET_FILE_PATH = 'weights/s5.map'
+        self.TARGET_FILE_PATH = 'flask_server/map/11_20.map'
         self.player_pos = [0.0, 0.0, 0.0] 
         self.map_data_cache = self.load_target_coordinates()
         
@@ -394,9 +394,9 @@ class ScreenDetector:
         cv2.destroyAllWindows()
 
     def update_player_pos_from_server(self):
-        """Flask 서버(server_D_1110.py)의 /debug_state에서 플레이어 위치를 가져옴"""
+        """Flask 서버(sinario_1120.py)의 /info에서 플레이어 위치를 가져옴"""
         try:
-            resp = requests.get(f"{self.server_url}/debug_state", timeout=0.2)
+            resp = requests.get(f"{self.server_url}/info", timeout=0.2)
             if resp.status_code != 200:
                 return
             data = resp.json()
@@ -412,7 +412,7 @@ class ScreenDetector:
             pass
 
 if __name__ == "__main__":
-    MODEL_FILE_PATH = 'weights/5cls_v5_2_case2_best.pt' 
+    MODEL_FILE_PATH = 'detector_gui/weights/5cls_v5_2_case2_best.pt' 
     detector = ScreenDetector(model_path=MODEL_FILE_PATH)
     detector.run_detection()
 
