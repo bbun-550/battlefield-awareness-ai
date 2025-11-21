@@ -22,7 +22,7 @@ app = Flask(__name__)
 # log / csv / map 파일 경로
 LOG_FILE    = r"C:\Users\acorn\Documents\Tank Challenge\log_data\tank_info_log.txt"
 OUTPUT_CSV  = r"C:\Users\acorn\Documents\Tank Challenge\log_data\output.csv"
-MAP_FILE    = "flask_server/map/11_20.map"
+MAP_FILE    = r"\map\11_20_tuning.map"
 
 # server_player_pos 초기화
 server_player_pos = [0.0, 0.0, 0.0]

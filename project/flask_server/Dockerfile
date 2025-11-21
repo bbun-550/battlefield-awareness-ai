@@ -6,7 +6,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY sinario_1120.py .
+COPY scenario_1120.py .
 
 EXPOSE 5000
-CMD ["python", "sinario_1120.py"]
+CMD ["python", "scenario_1120.py"]
