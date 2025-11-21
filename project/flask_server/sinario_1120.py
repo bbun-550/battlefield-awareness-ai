@@ -24,6 +24,9 @@ LOG_FILE    = r"C:\Users\acorn\Documents\Tank Challenge\log_data\tank_info_log.t
 OUTPUT_CSV  = r"C:\Users\acorn\Documents\Tank Challenge\log_data\output.csv"
 MAP_FILE    = "flask_server/map/11_20.map"
 
+# server_player_pos 초기화
+server_player_pos = [0.0, 0.0, 0.0]
+
 # ------------------------------------------------------------
 # WAYPOINT 목록
 # ------------------------------------------------------------
@@ -464,30 +467,33 @@ def info():
     게임에서 POST 요청으로 보내준 플레이어 좌표(x, y, z)를 수신하여
     탐지기 인스턴스의 player_pos 변수에 업데이트함.
     """
-    global detector_instance
-    if detector_instance is None:
-        return "Detector not ready", 503
+    global server_player_pos
 
     try:
         # JSON 데이터 파싱
         data = request.get_json(force=True)
-        player_pos_data = data.get('playerPos', {})
-        
-        x = float(player_pos_data.get('x', 0.0))
-        y = float(player_pos_data.get('y', 0.0))
-        z = float(player_pos_data.get('z', 0.0)) 
+        pos = data.get('playerPos', {})
+                
+        x = float(pos.get('x', 0.0))
+        y = float(pos.get('y', 0.0))
+        z = float(pos.get('z', 0.0)) 
 
         # 좌표 업데이트
-        detector_instance.player_pos = [x, y, z] 
-        
+        server_player_pos = [x, y, z]
         return "OK", 200
     except Exception as e:
         print(f"Data Error: {e}")
         return "Error", 400
 
-# @app.route('/info', methods=['POST'])
-# def info():
-#     return jsonify({"status": "success"})
+@app.route('/info', methods=['GET'])
+def info_get():
+    return jsonify({
+        "pos":{
+            "x":server_player_pos[0],
+            "y":server_player_pos[1],
+            "z":server_player_pos[2]
+        }
+    })
 
 @app.route('/update_obstacle', methods=['POST'])
 def update_obstacle():
