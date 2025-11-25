@@ -57,7 +57,7 @@ class ScreenDetector:
         self.MAX_DRAW_DISTANCE_M = 200.0 
         
         # 맵 파일(장애물 좌표) 로드
-        self.TARGET_FILE_PATH = r'C:\Users\acorn\team1\Acorn_1Team\project\flask_server\map\11_20_tuning.map'
+        self.TARGET_FILE_PATH = r'C:\Users\acorn\team1\Acorn_1Team\project\flask_server\map\11_24_tuning.map'
         self.player_pos = [0.0, 0.0, 0.0] 
         self.map_data_cache = self.load_target_coordinates()
         
