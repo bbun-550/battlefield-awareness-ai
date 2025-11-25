@@ -13,12 +13,11 @@ from ultralytics import YOLO
 # 기본 설정
 # ------------------------------------------------------------
 app = Flask(__name__)
-model = YOLO('5cls_v6_case2_best.pt')
 
 # 파일 경로 (사용자 환경에 맞게 확인 필요)
-LOG_FILE    = r"C:\Users\cheei\Documents\Tank Challenge\log_data\tank_info_log.txt"
-OUTPUT_CSV  = r"C:\Users\cheei\Documents\Tank Challenge\log_data\output.csv"
-MAP_FILE    = r"11_20.map"
+LOG_FILE    = r"C:\\Users\\cheei\\Documents\\Tank Challenge\\log_data\\tank_info_log.txt"
+OUTPUT_CSV  = r"C:\\Users\\cheei\\Documents\\Tank Challenge\\log_data\\output.csv"
+MAP_FILE    = r"11_25.map"
 
 # ------------------------------------------------------------
 # WAYPOINT (주요 경유지)
@@ -38,10 +37,10 @@ WAYPOINTS = [
 # ------------------------------------------------------------
 # Global State Variables
 # ------------------------------------------------------------
-FINAL_PATH = []         # A*로 생성된 전체 경로 (점들의 리스트)
+FINAL_PATH = []         # A*로 생성된 전체 경로
 path_generated = False  # 경로 생성 여부 체크
 
-current_key_wp_index = 0  # WAYPOINTS 리스트의 몇 번째를 향해 가고 있는지 (이벤트 체크용)
+current_key_wp_index = 0  # WAYPOINTS 인덱스
 wait_start_time = None
 
 # 포격 관련
@@ -50,14 +49,15 @@ FIRE_COUNT      = 0
 RECENTER_TURRET = False
 FIRE_AIM_START  = None
 
-# 맵 장애물 정보
-TANK_OBJS = []
+# 맵 정보 리스트 분리
+ALL_OBSTACLES = []  # 이동 방해물 (Tank, Car, Rock) -> A* 경로 계산용
+TARGET_TANKS  = []  # 공격 대상 (Only Tank)        -> 포격 계산용
 
 # ------------------------------------------------------------
 # A* Algorithm Implementation
 # ------------------------------------------------------------
 GRID_SIZE = 1.0       # 격자 크기 (1m)
-OBSTACLE_MARGIN = 4.0 # 장애물 안전 거리 (탱크가 부딪히지 않게 여유 둠)
+OBSTACLE_MARGIN = 4.0 # 장애물 안전 거리
 
 def world_to_grid(x, z):
     return int(round(x / GRID_SIZE)), int(round(z / GRID_SIZE))
@@ -68,8 +68,8 @@ def grid_to_world(r, c):
 def get_blocked_cells(obstacles):
     blocked = set()
     margin_steps = int(math.ceil(OBSTACLE_MARGIN / GRID_SIZE))
-    print(f"🛠️ Building Obstacle Map (Margin: {OBSTACLE_MARGIN}m)...")
-
+    print(f"🛠️ Building Obstacle Map with {len(obstacles)} objects...")
+    
     for ob in obstacles:
         ox, oz = ob['x'], ob['z']
         gr, gc = world_to_grid(ox, oz)
@@ -87,16 +87,16 @@ def heuristic(a, b):
 def a_star_search(start_pos, end_pos, blocked_cells):
     start_node = world_to_grid(*start_pos)
     end_node   = world_to_grid(*end_pos)
-
+    
     neighbors = [(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]
     open_set = []
     heapq.heappush(open_set, (0, start_node))
-
+    
     came_from = {}
     g_score = {start_node: 0}
     f_score = {start_node: heuristic(start_node, end_node)}
-
-    best_node = start_node # 만약 길을 못 찾으면 가장 가까운 곳이라도 가기 위함
+    
+    best_node = start_node
     min_dist_to_goal = heuristic(start_node, end_node)
 
     while open_set:
@@ -121,7 +121,7 @@ def a_star_search(start_pos, end_pos, blocked_cells):
         for dx, dy in neighbors:
             neighbor = (current[0] + dx, current[1] + dy)
             if neighbor in blocked_cells: continue
-
+            
             move_cost = 1.414 if dx != 0 and dy != 0 else 1.0
             tentative_g = g_score[current] + move_cost
 
@@ -130,9 +130,8 @@ def a_star_search(start_pos, end_pos, blocked_cells):
                 g_score[neighbor] = tentative_g
                 f_score[neighbor] = tentative_g + heuristic(neighbor, end_node)
                 heapq.heappush(open_set, (f_score[neighbor], neighbor))
-
+    
     print("⚠️ A* Path Not Found to exact target. Using closest approach.")
-    # 경로를 못 찾았으면 start -> ... -> best_node -> end (직선) 라도 반환
     path = []
     curr = best_node
     while curr in came_from:
@@ -145,10 +144,12 @@ def a_star_search(start_pos, end_pos, blocked_cells):
 
 def generate_full_path(start_x, start_z):
     """ 전체 경로 생성기 """
-    global FINAL_PATH, WAYPOINTS, TANK_OBJS
-
+    global FINAL_PATH, WAYPOINTS, ALL_OBSTACLES
+    
     print("🗺️ Generating Full A* Path...")
-    blocked = get_blocked_cells(TANK_OBJS)
+    # [수정됨] 이동 시에는 모든 장애물(Tank, Car, Rock)을 피함
+    blocked = get_blocked_cells(ALL_OBSTACLES)
+    
     full_path = [(start_x, start_z)]
     current_pos = (start_x, start_z)
 
@@ -168,24 +169,40 @@ def generate_full_path(start_x, start_z):
 # MAP Load
 # ------------------------------------------------------------
 def load_map():
-    global TANK_OBJS
-    TANK_OBJS = []
+    global ALL_OBSTACLES, TARGET_TANKS
+    ALL_OBSTACLES = []
+    TARGET_TANKS = []
+
     if not os.path.exists(MAP_FILE):
         print("MAP not found:", MAP_FILE)
         return
+
     with open(MAP_FILE, "r", encoding="utf-8") as f:
         data = json.load(f)
+
+    # 장애물로 인식할 키워드 (이동 방해물)
+    OBSTACLE_KEYWORDS = ["tank", "car", "rock"] 
+
     for ob in data.get("obstacles", []):
         name = str(ob.get("prefabName", "")).lower()
-        if name.startswith("tank"):
-            pos = ob.get("position", {})
-            TANK_OBJS.append({
-                "name": ob.get("prefabName", "Tank"),
-                "x": float(pos.get("x", 0.0)),
-                "y": float(pos.get("y", 0.0)),
-                "z": float(pos.get("z", 0.0))
-            })
-    print(f"Loaded TANK obstacles: {len(TANK_OBJS)}")
+        pos = ob.get("position", {})
+        
+        obj_data = {
+            "name": ob.get("prefabName", "Unknown"),
+            "x": float(pos.get("x", 0.0)),
+            "y": float(pos.get("y", 0.0)),
+            "z": float(pos.get("z", 0.0))
+        }
+
+        # 1. 모든 장애물 리스트에 추가 (A* 경로 계산용)
+        if any(k in name for k in OBSTACLE_KEYWORDS):
+            ALL_OBSTACLES.append(obj_data)
+
+        # 2. 타겟 리스트에 추가 (포격용: 오직 탱크만)
+        if "tank" in name:
+            TARGET_TANKS.append(obj_data)
+
+    print(f"✅ Map Loaded: Obstacles(Nav)={len(ALL_OBSTACLES)}, Targets(Fire)={len(TARGET_TANKS)}")
 
 load_map()
 
@@ -209,29 +226,25 @@ def read_body_yaw_from_log():
     return None
 
 def get_lookahead_target_from_path(px, pz, lookahead=6.0):
-    """ A*로 생성된 FINAL_PATH에서 Lookahead 지점 찾기 """
     global FINAL_PATH
     if not FINAL_PATH: return (px, pz)
 
     closest_idx = 0
     min_dist = 9999.0
-
-    # 1. 경로상에서 나와 가장 가까운 점 찾기 (검색 최적화를 위해 전체 탐색 대신 근처 탐색 가능하지만 여기선 전체 탐색)
-    # 경로가 길어지면 성능 이슈가 있을 수 있으나 1000개 미만은 순식간임.
+    
     for i, (nx, nz) in enumerate(FINAL_PATH):
         d = math.hypot(nx - px, nz - pz)
         if d < min_dist:
             min_dist = d
             closest_idx = i
 
-    # 2. 거기서부터 lookahead 거리만큼 떨어진 점 찾기
     for i in range(closest_idx, len(FINAL_PATH)):
         nx, nz = FINAL_PATH[i]
         d = math.hypot(nx - px, nz - pz)
         if d >= lookahead:
             return (nx, nz)
-
-    return FINAL_PATH[-1] # 끝까지 안 나오면 마지막 점 리턴
+    
+    return FINAL_PATH[-1]
 
 # ------------------------------------------------------------
 # 포격 계산
@@ -240,8 +253,10 @@ MIN_PITCH_CFG, MAX_PITCH_CFG = -30.0, 10.0
 V_INIT, G, MAX_RANGE, H_OFFSET = 58.0, 9.81, 130.0, 2.1
 
 def pick_closest(px, pz):
+    global TARGET_TANKS
+    # [수정됨] 포격 대상은 오직 TARGET_TANKS(탱크) 중에서만 검색
     best, bd = None, 9999.0
-    for ob in TANK_OBJS:
+    for ob in TARGET_TANKS:
         d = math.hypot(ob["x"] - px, ob["z"] - pz)
         if d < bd: bd, best = d, ob
     return best, bd
@@ -283,7 +298,7 @@ def aim_good_enough(ex, ey): return abs(ex) < 3.0 and abs(ey) < 3.0
 # ------------------------------------------------------------
 # GET_ACTION (MAIN LOGIC)
 # ------------------------------------------------------------
-FIRST_FIRE_DELAY = 0.6
+FIRST_FIRE_DELAY = 0.6 
 
 @app.route("/get_action", methods=["POST"])
 def get_action():
@@ -297,7 +312,7 @@ def get_action():
     tx, ty = float(turret.get("x", 0)), float(turret.get("y", 0))
 
     body_yaw = read_body_yaw_from_log()
-    if body_yaw is None: body_yaw = tx
+    if body_yaw is None: body_yaw = tx 
 
     # ---------------------------------------------
     # 0. 초기화: A* 경로 생성 (최초 1회)
@@ -312,7 +327,7 @@ def get_action():
     # ---------------------------------------------
     if FIRE_MODE:
         sol = compute_solution(px, py, pz, tx, ty)
-        if not sol["ok"]: # 타겟 없으면 정지
+        if not sol["ok"]:
             return jsonify({"moveWS": {"command": "STOP", "weight": 1}, "moveAD": {"command": "", "weight": 0}, "turretQE": {"command": "", "weight": 0}, "turretRF": {"command": "", "weight": 0}, "fire": False})
 
         ctrl = turret_ctrl(tx, ty, sol["yaw"], sol["pitch"])
@@ -365,32 +380,29 @@ def get_action():
                 if wait_start_time is None: wait_start_time = time.time()
                 if time.time() - wait_start_time < 3.0:
                     return jsonify({"moveWS": {"command": "STOP", "weight": 1}, "moveAD": {"command": "", "weight": 0}, "turretQE": {"command": "", "weight": 0}, "turretRF": {"command": "", "weight": 0}, "fire": False})
-
+                
                 current_key_wp_index += 1
                 wait_start_time = None
 
-            # [1]번 WP (기존 5번에서 변경됨): 포격 모드
+            # [1]번 WP: 포격 모드
             elif current_key_wp_index == 1:
                 FIRE_MODE = True
                 FIRE_COUNT = 0
                 FIRE_AIM_START = None
-                print("🔥 START FIRE MODE (New Index)")
+                print("🔥 START FIRE MODE")
                 return jsonify({"moveWS": {"command": "STOP", "weight": 1}, "moveAD": {"command": "", "weight": 0}, "turretQE": {"command": "", "weight": 0}, "turretRF": {"command": "", "weight": 0}, "fire": False})
-
-            # 일반 WP: 그냥 통과 (인덱스만 증가)
+            
             else:
                 current_key_wp_index += 1
 
     # ---------------------------------------------
     # 4. 주행 제어 (A* Path + Drift Driving)
     # ---------------------------------------------
-    # 설정값 (드리프트 주행을 위한 세팅)
-    MAX_SPEED = 0.6    # 최고 속도
-    LOOK_DIST = 10.0   # 전방 주시 거리
-    STEER_GAIN = 0.04  # 회전 민감도 (0.03 -> 0.04로 약간 상향)
-    PIVOT_LIMIT = 45.0 # 제자리 회전 기준 완화 (20도 -> 45도)
+    MAX_SPEED = 0.6
+    LOOK_DIST = 10.0
+    STEER_GAIN = 0.04
+    PIVOT_LIMIT = 45.0
 
-    # A* 경로에서 목표점 찾기
     target_x, target_z = get_lookahead_target_from_path(px, pz, LOOK_DIST)
 
     dx, dz = target_x - px, target_z - pz
@@ -401,7 +413,6 @@ def get_action():
     diff = normalize(target_angle - body_yaw)
     abs_diff = abs(diff)
 
-    # 1. 정말 급한 코너(45도 이상)만 제자리 회전
     if abs_diff > PIVOT_LIMIT:
         pivot_weight = min(1.0, max(0.3, abs_diff * 0.03))
         return jsonify({
@@ -410,13 +421,10 @@ def get_action():
             "turretQE": {"command": "", "weight": 0}, "turretRF": {"command": "", "weight": 0}, "fire": False
         })
 
-    # 2. 드리프트 주행 (멈추지 않고 돔)
-    # 각도가 클수록 전진 속도는 줄이지만, 절대 멈추지는 않음 (최소 0.3 보장)
     raw_fwd = 1.0 - (abs_diff / 60.0)
     fwd_weight = min(MAX_SPEED, max(0.3, raw_fwd))
-
     turn_weight = min(1.0, max(0.0, abs_diff * STEER_GAIN))
-
+    
     return jsonify({
         "moveWS":   {"command": "W", "weight": fwd_weight},
         "moveAD":   {"command": "D" if diff > 0 else "A", "weight": turn_weight},
@@ -451,7 +459,7 @@ def update_bullet():
 # 기타 API
 # ------------------------------------------------------------
 @app.route('/detect', methods=['POST'])
-def detect(): return jsonify([]) # 생략 (필요시 복구)
+def detect(): return jsonify([]) 
 @app.route('/info', methods=['POST'])
 def info(): return jsonify({"status": "success"})
 @app.route('/update_obstacle', methods=['POST'])
