@@ -3,8 +3,8 @@ import cv2
 import numpy as np
 from mss import mss
 from ultralytics import YOLO
-import math  
-import json 
+import math
+import json
 import os
 import time
 import requests
