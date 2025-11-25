@@ -3,58 +3,28 @@ import cv2
 import numpy as np
 from mss import mss
 from ultralytics import YOLO
-import math  
-import json 
+import math
+import json
 import os
 import time
-import threading
-import logging
-import keyboard  # [중요] 게임 화면이 활성화된 상태에서도 키 입력을 받기 위한 라이브러리
-from flask import Flask, request
+import requests
+import keyboard
 from PIL import ImageFont, ImageDraw, Image, ImageSequence
 
 # ---------------------------------------------------------
 # [Flask 설정] 외부(게임 등)에서 플레이어 좌표 데이터를 받기 위한 서버
 # ---------------------------------------------------------
 # Flask의 불필요한 로그 출력 끄기
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
-
-app = Flask(__name__)
-detector_instance = None  # 전역 변수로 탐지기 인스턴스 접근
-
-@app.route('/info', methods=['POST'])
-def info():
-    """
-    게임에서 POST 요청으로 보내준 플레이어 좌표(x, y, z)를 수신하여
-    탐지기 인스턴스의 player_pos 변수에 업데이트함.
-    """
-    global detector_instance
-    if detector_instance is None:
-        return "Detector not ready", 503
-
-    try:
-        # JSON 데이터 파싱
-        data = request.get_json(force=True)
-        player_pos_data = data.get('playerPos', {})
-        
-        x = float(player_pos_data.get('x', 0.0))
-        y = float(player_pos_data.get('y', 0.0))
-        z = float(player_pos_data.get('z', 0.0)) 
-
-        # 좌표 업데이트
-        detector_instance.player_pos = [x, y, z] 
-        
-        return "OK", 200
-    except Exception as e:
-        print(f"Data Error: {e}")
-        return "Error", 400
 
 class ScreenDetector:
-    def __init__(self, model_path='5cls_v5_2_case2_best.pt'):
+    def __init__(self, model_path='5cls_v6_case9_best.pt', server_url='http://127.0.0.1:5000'):
         # ---------------------------------------------------------
         # [초기화] 화면 캡처, 모델 로드, 설정값 정의
         # ---------------------------------------------------------
+        self.server_url = server_url
+        self.player_pos = [0.0, 0.0, 0.0]
+
+        # 화면 해상도 설정 (기본 FHD)
         self.screen_width = 1920
         self.screen_height = 1080
 
@@ -87,7 +57,7 @@ class ScreenDetector:
         self.MAX_DRAW_DISTANCE_M = 200.0 
         
         # 맵 파일(장애물 좌표) 로드
-        self.TARGET_FILE_PATH = r'C:\test\tankchallenge\Hud\test.map'
+        self.TARGET_FILE_PATH = r'C:\Users\acorn\team1\Acorn_1Team\project\flask_server\map\11_24_tuning.map'
         self.player_pos = [0.0, 0.0, 0.0] 
         self.map_data_cache = self.load_target_coordinates()
         
@@ -229,6 +199,9 @@ class ScreenDetector:
 
         while True:
             try:
+                # 서버에서 플레이어 위치 갱신
+                self.update_player_pos_from_server()
+                
                 # 1. 화면 캡처 (MSS)
                 img_mss = self.sct.grab(self.monitor)
                 img = np.array(img_mss)
@@ -444,18 +417,26 @@ class ScreenDetector:
     def close(self):
         cv2.destroyAllWindows()
 
-# Flask 서버 실행 함수
-def run_flask():
-    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+    def update_player_pos_from_server(self):
+        """Flask 서버(sinario_1120.py)의 /info에서 플레이어 위치를 가져옴"""
+        try:
+            resp = requests.get(f"{self.server_url}/info", timeout=0.2)
+            if resp.status_code != 200:
+                return
+            data = resp.json()
+            pos = data.get("pos")
+            if isinstance(pos, dict):
+                x = float(pos.get("x", 0.0))
+                z = float(pos.get("z", 0.0))
+                # y는 시뮬레이터 상에서 크게 의미 없어서 0.0으로 고정
+                self.player_pos = [x, 0.0, z]
+        except Exception as e:
+            # 서버 미응답 시 그냥 이전 위치 유지
+            # print(f"[WARN] 서버에서 위치 받기 실패: {e}")
+            pass
+
 
 if __name__ == "__main__":
-    MODEL_FILE_PATH = '5cls_v5_2_case2_best.pt' 
+    MODEL_FILE_PATH = 'detector_gui/weights/5cls_v6_case9_best.pt'
     detector_instance = ScreenDetector(model_path=MODEL_FILE_PATH)
-    
-    # Flask 서버를 별도 스레드로 실행 (탐지 루프와 병렬 실행)
-    flask_thread = threading.Thread(target=run_flask)
-    flask_thread.daemon = True
-    flask_thread.start()
-    
-    # 메인 탐지 루프 실행
     detector_instance.run_detection()
