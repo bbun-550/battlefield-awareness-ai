@@ -6,6 +6,8 @@ services:
     container_name: flask_server
     ports:
       - "5000:5000"
+    volumes:
+      - ./flask_server:/data
     networks:
       - ai_net
     restart: always
