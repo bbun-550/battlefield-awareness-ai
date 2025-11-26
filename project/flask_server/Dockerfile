@@ -15,5 +15,3 @@ COPY server_1126.py .
 
 EXPOSE 5000
 CMD ["python", "server_1126.py"]
-
-
