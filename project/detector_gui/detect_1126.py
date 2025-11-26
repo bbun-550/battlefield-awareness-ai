@@ -175,9 +175,9 @@ class ScreenDetector:
         enemies = red_cnt + tank_cnt
         if enemies > 0:
             if tank_cnt > 0:
-                return f" 위험: 적 전차 {tank_cnt}대 식별!"
+                return f" 위험! 적 전차 {tank_cnt}대 식별!"
             else:
-                return f" 경고: 적군 {red_cnt}명 접근 중"
+                return f" 경고! 적군 {red_cnt}명 접근 중"
         elif blue_cnt > 0:
             return f" 아군 {blue_cnt}명과 합류 가능"
         elif len(counts) > 0:
@@ -227,7 +227,7 @@ class ScreenDetector:
 
                 # 4. 맵 데이터와 탐지된 객체 매칭 (Matching Logic)
                 unique_classes = set(b['cls_name'] for b in current_frame_boxes)
-                total_counts = {} 
+                total_counts = {}
 
                 for cls_name in unique_classes:
                     # 해당 클래스의 박스들만 추출
@@ -414,7 +414,7 @@ class ScreenDetector:
         cv2.destroyAllWindows()
 
     def update_player_pos_from_server(self):
-        """Flask 서버(server_1125.py)의 /info에서 플레이어 위치를 가져옴"""
+        """Flask 서버(server_1126.py)의 /info에서 플레이어 위치를 가져옴"""
         try:
             resp = requests.get(f"{self.server_url}/info", timeout=0.2)
             if resp.status_code != 200:
