@@ -1,10 +1,13 @@
+# 콘다에서 설치
+# python -m pip install keyboard
+
 import sys
 import cv2
 import numpy as np
 from mss import mss
 from ultralytics import YOLO
-import math  
-import json 
+import math
+import json
 import os
 import time
 import threading
@@ -37,14 +40,14 @@ def info():
         # JSON 데이터 파싱
         data = request.get_json(force=True)
         player_pos_data = data.get('playerPos', {})
-        
+
         x = float(player_pos_data.get('x', 0.0))
         y = float(player_pos_data.get('y', 0.0))
-        z = float(player_pos_data.get('z', 0.0)) 
+        z = float(player_pos_data.get('z', 0.0))
 
         # 좌표 업데이트
-        detector_instance.player_pos = [x, y, z] 
-        
+        detector_instance.player_pos = [x, y, z]
+
         return "OK", 200
     except Exception as e:
         print(f"Data Error: {e}")
@@ -67,13 +70,13 @@ class ScreenDetector:
         full_model_path = os.path.join(base_path, model_path)
         if not os.path.exists(full_model_path):
             full_model_path = model_path
-            
+
         self.model = YOLO(full_model_path)
         self.class_names = self.model.names
-        
+
         # 거리 계산을 위한 초점 거리 상수 (임의 설정값)
-        self.FOCAL_LENGTH_PX = 1000 
-        
+        self.FOCAL_LENGTH_PX = 1000
+
         # [거리 추정용] 각 클래스별 실제 너비 (단위: 미터)
         self.KNOWN_WIDTH_M = {
             0: 1.6,   # Red (사람)
@@ -82,21 +85,21 @@ class ScreenDetector:
             3: 15.2,  # Rock
             4: 13.7   # Tank
         }
-        
+
         # 화면에 그릴 최대 거리 제한
-        self.MAX_DRAW_DISTANCE_M = 200.0 
-        
+        self.MAX_DRAW_DISTANCE_M = 200.0
+
         # 맵 파일(장애물 좌표) 로드
         self.TARGET_FILE_PATH = r'C:\test\tankchallenge\Hud\test.map'
-        self.player_pos = [0.0, 0.0, 0.0] 
+        self.player_pos = [0.0, 0.0, 0.0]
         self.map_data_cache = self.load_target_coordinates()
-        
+
         # [폰트 설정] 한글 출력을 위한 폰트 로드
         self.font_path = "C:/Windows/Fonts/malgun.ttf"
-        self.bold_font_path = "C:/Windows/Fonts/malgunbd.ttf" 
-        
+        self.bold_font_path = "C:/Windows/Fonts/malgunbd.ttf"
+
         try:
-            self.font = ImageFont.truetype(self.font_path, 20) 
+            self.font = ImageFont.truetype(self.font_path, 20)
             if os.path.exists(self.bold_font_path):
                 self.font_bold = ImageFont.truetype(self.bold_font_path, 20)
             else:
@@ -114,11 +117,11 @@ class ScreenDetector:
         self.is_reloading = False # 현재 리로딩 중인지 상태 플래그
         self.reload_start_time = 0 # 리로딩 시작 시간
         self.RELOAD_DURATION = 7.0 # 리로딩 지속 시간 (7초)
-        
+
         self.load_gif_frames() # GIF 미리 로드 실행
 
     def load_gif_frames(self):
-        """ 
+        """
         [최적화] 실행 중에 파일을 읽으면 렉이 걸리므로,
         시작할 때 GIF의 모든 프레임을 미리 메모리에 로드해둡니다.
         """
@@ -155,10 +158,10 @@ class ScreenDetector:
                         pos = obj['position']
                         full_name = obj['prefabName']
                         standardized_targets.append({
-                            'id': full_name, 
+                            'id': full_name,
                             'prefabName': full_name.lower(),
                             'x': float(pos.get('x', 0.0)),
-                            'y': float(pos.get('y', 0.0)), 
+                            'y': float(pos.get('y', 0.0)),
                             'z': float(pos.get('z', 0.0))
                         })
                 return standardized_targets
@@ -177,8 +180,8 @@ class ScreenDetector:
     def calculate_real_distance(self, p_pos, t_obj):
         """ [실제 거리] 플레이어 좌표와 맵 객체 좌표 간의 3차원 거리를 계산합니다. """
         return math.sqrt(
-            (p_pos[0] - t_obj['x'])**2 + 
-            (p_pos[1] - t_obj['y'])**2 + 
+            (p_pos[0] - t_obj['x'])**2 +
+            (p_pos[1] - t_obj['y'])**2 +
             (p_pos[2] - t_obj['z'])**2
         )
 
@@ -205,7 +208,7 @@ class ScreenDetector:
             if 'red' in kl: red_cnt += v
             elif 'tank' in kl: tank_cnt += v
             elif 'blue' in kl: blue_cnt += v
-        
+
         enemies = red_cnt + tank_cnt
         if enemies > 0:
             if tank_cnt > 0:
@@ -221,7 +224,7 @@ class ScreenDetector:
 
     def run_detection(self):
         print("객체 탐지 시작... (Spacebar: Reload GIF 출력 - Global Key 감지)")
-        
+
         # 맵 데이터 매칭을 위한 필터 키워드
         CAR_FILTERS = ['car001', 'car002', 'car003', 'car004', 'car005']
         ROCK_FILTERS = ['rock001', 'rock002']
@@ -233,10 +236,10 @@ class ScreenDetector:
                 img_mss = self.sct.grab(self.monitor)
                 img = np.array(img_mss)
                 frame = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR) # RGBA -> BGR 변환
-                
+
                 # 2. YOLO 객체 탐지 수행
                 results = self.model(frame, verbose=False, conf=0.7, iou=0.38)
-                
+
                 # 3. 탐지된 박스 데이터 정리
                 current_frame_boxes = []
                 for box in results[0].boxes:
@@ -244,27 +247,27 @@ class ScreenDetector:
                     cls_id = int(box.cls[0])
                     cls_name = self.class_names.get(cls_id, 'unknown')
                     sim_dist = self.calculate_sim_distance(cls_id, x1, x2)
-                    
+
                     # 너무 먼 거리(200m 이상)는 무시
                     if sim_dist > self.MAX_DRAW_DISTANCE_M: continue
-                    
+
                     current_frame_boxes.append({
                         'bbox': (x1, y1, x2, y2),
                         'cls_id': cls_id,
                         'cls_name': cls_name,
                         'sim_dist': sim_dist,
-                        'matched_map_obj': None 
+                        'matched_map_obj': None
                     })
 
                 # 4. 맵 데이터와 탐지된 객체 매칭 (Matching Logic)
                 unique_classes = set(b['cls_name'] for b in current_frame_boxes)
-                total_counts = {} 
+                total_counts = {}
 
                 for cls_name in unique_classes:
                     # 해당 클래스의 박스들만 추출
                     cls_boxes = [b for b in current_frame_boxes if b['cls_name'] == cls_name]
                     total_counts[cls_name] = len(cls_boxes)
-                    
+
                     # 맵 데이터에서 해당 클래스와 관련된 객체 필터링
                     cls_lower = cls_name.lower()
                     relevant_map_objs = []
@@ -277,7 +280,7 @@ class ScreenDetector:
                         elif cls_lower == 'car' and any(f in map_prefab for f in CAR_FILTERS): is_match = True
                         elif cls_lower == 'tank' and any(f in map_prefab for f in TANK_FILTERS): is_match = True
                         elif cls_lower == 'rock' and any(f in map_prefab for f in ROCK_FILTERS): is_match = True
-                        
+
                         if is_match:
                             # 거리 계산 (플레이어 위치 기준)
                             dist = self.calculate_real_distance(self.player_pos, m_obj)
@@ -292,12 +295,12 @@ class ScreenDetector:
                         for map_idx, map_obj in enumerate(relevant_map_objs):
                             diff = abs(box['sim_dist'] - map_obj['real_dist'])
                             match_candidates.append({'diff': diff, 'box_idx': box_idx, 'map_idx': map_idx})
-                    
+
                     match_candidates.sort(key=lambda x: x['diff'])
-                    
+
                     used_boxes = set()
                     used_maps = set()
-                    
+
                     # 1:1 매칭 우선 수행
                     for cand in match_candidates:
                         b_idx = cand['box_idx']
@@ -306,7 +309,7 @@ class ScreenDetector:
                             cls_boxes[b_idx]['matched_map_obj'] = relevant_map_objs[m_idx]
                             used_boxes.add(b_idx)
                             used_maps.add(m_idx)
-                    
+
                     # 매칭되지 않은 박스들에 대해 가장 가까운 근사값 매칭 (N:1)
                     for b_idx, box in enumerate(cls_boxes):
                         if box['matched_map_obj'] is None:
@@ -332,10 +335,10 @@ class ScreenDetector:
                     img_pil = img_pil.convert("RGBA")
                     overlay = Image.new('RGBA', img_pil.size, (0, 0, 0, 0)) # 투명 레이어
                     draw = ImageDraw.Draw(overlay)
-                    
+
                     hud_text_list = []
                     current_frame_boxes.sort(key=lambda x: x['sim_dist'])
-                    counters = {} 
+                    counters = {}
 
                     # 각 객체 위에 이름과 거리 텍스트 표시
                     for box in current_frame_boxes:
@@ -346,7 +349,7 @@ class ScreenDetector:
                         counters[cls_name] += 1
                         bgr = self.get_fixed_color(cls_name)
                         map_obj = box['matched_map_obj']
-                        
+
                         if map_obj:
                             real_d = map_obj['real_dist']
                             label_dist = f"R : {real_d:.1f}m"
@@ -360,34 +363,34 @@ class ScreenDetector:
                             # 매칭 실패 시 추정 거리 표시
                             label = f"{simple_name} (추정:{box['sim_dist']:.1f}m)"
                             draw.text((x1, y1-25), label, font=self.font_bold, fill=(180, 180, 180))
-                    
+
                     # 7. 좌측 상단 HUD 패널 그리기
                     hud_text_list.sort()
-                    display_list = hud_text_list[:20] 
+                    display_list = hud_text_list[:20]
                     situation_text = self.analyze_battlefield(total_counts)
                     summary_text = " | ".join([f"{k.capitalize()}: {v}개" for k, v in total_counts.items()])
-                    
-                    base_x, base_y = 5, 50  
+
+                    base_x, base_y = 5, 50
                     line_height = 25
-                    max_text_width = 300 
+                    max_text_width = 300
                     all_texts = ["전장상황인식", situation_text, summary_text] + display_list
-                    
+
                     # HUD 박스 너비 자동 계산
                     for txt in all_texts:
                         w = draw.textlength(txt, font=self.font_bold)
                         if w > max_text_width: max_text_width = int(w)
-                    
+
                     total_box_height = 35 + 30 + 30 + (len(display_list) * line_height) + 40
-                    
+
                     # 반투명 검정 배경 박스 그리기
                     draw.rounded_rectangle([(base_x, base_y), (base_x + max_text_width + 110, base_y + total_box_height)], fill=(0, 0, 0, 200), radius=10)
-                    
+
                     # HUD 내용 텍스트 그리기
                     tx, ty = base_x + 10, base_y + 5
                     draw.text((tx, ty), "전장상황인식", font=self.font_bold, fill=(255, 255, 255))
                     draw.text((tx, ty+35), f"현재 내 좌표: X : {self.player_pos[0]:.2f}, Z :{self.player_pos[2]:.2f}", font=self.font_bold, fill=(0, 255, 0))
                     draw.text((tx, ty+65), f"상황: {situation_text}", font=self.font_bold, fill=(255, 100, 100))
-                    
+
                     ty_list = ty + 95
                     for txt in display_list:
                         draw.text((tx, ty_list), txt, font=self.font_bold, fill=(200, 200, 200))
@@ -398,7 +401,7 @@ class ScreenDetector:
                     # 8. GIF 오버레이 & 키보드 감지 로직
                     # ---------------------------------------------------------
                     current_time = time.time()
-                    
+
                     # [키 입력 체크] keyboard 모듈을 사용해 게임 중에도 스페이스바 감지
                     if keyboard.is_pressed('space'):
                         if not self.is_reloading:
@@ -409,28 +412,28 @@ class ScreenDetector:
                     # [GIF 그리기] 리로딩 상태일 때만 실행
                     if self.is_reloading:
                         elapsed = current_time - self.reload_start_time
-                        
+
                         if elapsed > self.RELOAD_DURATION:
                             self.is_reloading = False # 7초 지나면 종료
-                        
+
                         elif self.gif_frames:
                             # 경과 시간에 맞춰 프레임 인덱스 계산 (애니메이션 속도 조절)
                             total_frames = len(self.gif_frames)
                             # 0.1초당 1프레임 기준 (*10)
                             frame_idx = int((elapsed * 10) % total_frames)
                             gif_frame = self.gif_frames[frame_idx]
-                            
+
                             # 화면 중앙 좌표 계산
                             cx = (self.screen_width - gif_frame.width) // 2
                             cy = (self.screen_height - gif_frame.height) // 2
-                            
+
                             # 투명도 유지하며 합성 (Alpha Composite)
                             overlay.alpha_composite(gif_frame, dest=(cx, cy))
-                    
+
                     # PIL 이미지 합성 후 다시 OpenCV 포맷으로 변환
                     out = Image.alpha_composite(img_pil, overlay)
                     frame = cv2.cvtColor(np.array(out.convert('RGB')), cv2.COLOR_RGB2BGR)
-                
+
                 # 9. 최종 화면 출력
                 cv2.imshow("Smart Map ID Tracker", frame)
                 if cv2.waitKey(1) & 0xFF == ord('q'): break
@@ -438,7 +441,7 @@ class ScreenDetector:
             except Exception as e:
                 print(f"Loop Error: {e}")
                 break
-        
+
         self.close()
 
     def close(self):
@@ -449,13 +452,13 @@ def run_flask():
     app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
 
 if __name__ == "__main__":
-    MODEL_FILE_PATH = '5cls_v5_2_case2_best.pt' 
+    MODEL_FILE_PATH = '5cls_v5_2_case2_best.pt'
     detector_instance = ScreenDetector(model_path=MODEL_FILE_PATH)
-    
+
     # Flask 서버를 별도 스레드로 실행 (탐지 루프와 병렬 실행)
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
-    
+
     # 메인 탐지 루프 실행
     detector_instance.run_detection()

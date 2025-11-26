@@ -7,7 +7,7 @@ from flask import Flask, request, jsonify
 import math, os, time, json, heapq
 import numpy as np
 import pandas as pd
-from ultralytics import YOLO
+# from ultralytics import YOLO
 
 # ------------------------------------------------------------
 # 기본 설정
@@ -15,8 +15,8 @@ from ultralytics import YOLO
 app = Flask(__name__)
 
 # 파일 경로 (사용자 환경에 맞게 확인 필요)
-LOG_FILE    = r"C:\\Users\\cheei\\Documents\\Tank Challenge\\log_data\\tank_info_log.txt"
-OUTPUT_CSV  = r"C:\\Users\\cheei\\Documents\\Tank Challenge\\log_data\\output.csv"
+LOG_FILE    = r"C:\Users\SeYun\anaconda3\envs\tf\TC\Tank Challenge\log_data\tank_info_log.txt"
+OUTPUT_CSV  = r"C:\Users\SeYun\anaconda3\envs\tf\TC\Tank Challenge\log_data\output.csv"
 MAP_FILE    = r"11_24_tuning.map"
 
 # ------------------------------------------------------------
@@ -69,7 +69,7 @@ def get_blocked_cells(obstacles):
     blocked = set()
     margin_steps = int(math.ceil(OBSTACLE_MARGIN / GRID_SIZE))
     print(f"🛠️ Building Obstacle Map with {len(obstacles)} objects...")
-    
+
     for ob in obstacles:
         ox, oz = ob['x'], ob['z']
         gr, gc = world_to_grid(ox, oz)
@@ -87,15 +87,15 @@ def heuristic(a, b):
 def a_star_search(start_pos, end_pos, blocked_cells):
     start_node = world_to_grid(*start_pos)
     end_node   = world_to_grid(*end_pos)
-    
+
     neighbors = [(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]
     open_set = []
     heapq.heappush(open_set, (0, start_node))
-    
+
     came_from = {}
     g_score = {start_node: 0}
     f_score = {start_node: heuristic(start_node, end_node)}
-    
+
     best_node = start_node
     min_dist_to_goal = heuristic(start_node, end_node)
 
@@ -121,7 +121,7 @@ def a_star_search(start_pos, end_pos, blocked_cells):
         for dx, dy in neighbors:
             neighbor = (current[0] + dx, current[1] + dy)
             if neighbor in blocked_cells: continue
-            
+
             move_cost = 1.414 if dx != 0 and dy != 0 else 1.0
             tentative_g = g_score[current] + move_cost
 
@@ -130,7 +130,7 @@ def a_star_search(start_pos, end_pos, blocked_cells):
                 g_score[neighbor] = tentative_g
                 f_score[neighbor] = tentative_g + heuristic(neighbor, end_node)
                 heapq.heappush(open_set, (f_score[neighbor], neighbor))
-    
+
     print("⚠️ A* Path Not Found to exact target. Using closest approach.")
     path = []
     curr = best_node
@@ -145,11 +145,11 @@ def a_star_search(start_pos, end_pos, blocked_cells):
 def generate_full_path(start_x, start_z):
     """ 전체 경로 생성기 """
     global FINAL_PATH, WAYPOINTS, ALL_OBSTACLES
-    
+
     print("🗺️ Generating Full A* Path...")
     # [수정됨] 이동 시에는 모든 장애물(Tank, Car, Rock)을 피함
     blocked = get_blocked_cells(ALL_OBSTACLES)
-    
+
     full_path = [(start_x, start_z)]
     current_pos = (start_x, start_z)
 
@@ -181,12 +181,12 @@ def load_map():
         data = json.load(f)
 
     # 장애물로 인식할 키워드 (이동 방해물)
-    OBSTACLE_KEYWORDS = ["tank", "car", "rock"] 
+    OBSTACLE_KEYWORDS = ["tank", "car", "rock"]
 
     for ob in data.get("obstacles", []):
         name = str(ob.get("prefabName", "")).lower()
         pos = ob.get("position", {})
-        
+
         obj_data = {
             "name": ob.get("prefabName", "Unknown"),
             "x": float(pos.get("x", 0.0)),
@@ -231,7 +231,7 @@ def get_lookahead_target_from_path(px, pz, lookahead=6.0):
 
     closest_idx = 0
     min_dist = 9999.0
-    
+
     for i, (nx, nz) in enumerate(FINAL_PATH):
         d = math.hypot(nx - px, nz - pz)
         if d < min_dist:
@@ -243,7 +243,7 @@ def get_lookahead_target_from_path(px, pz, lookahead=6.0):
         d = math.hypot(nx - px, nz - pz)
         if d >= lookahead:
             return (nx, nz)
-    
+
     return FINAL_PATH[-1]
 
 # ------------------------------------------------------------
@@ -298,7 +298,7 @@ def aim_good_enough(ex, ey): return abs(ex) < 3.0 and abs(ey) < 3.0
 # ------------------------------------------------------------
 # GET_ACTION (MAIN LOGIC)
 # ------------------------------------------------------------
-FIRST_FIRE_DELAY = 0.6 
+FIRST_FIRE_DELAY = 0.6
 
 @app.route("/get_action", methods=["POST"])
 def get_action():
@@ -312,7 +312,7 @@ def get_action():
     tx, ty = float(turret.get("x", 0)), float(turret.get("y", 0))
 
     body_yaw = read_body_yaw_from_log()
-    if body_yaw is None: body_yaw = tx 
+    if body_yaw is None: body_yaw = tx
 
     # ---------------------------------------------
     # 0. 초기화: A* 경로 생성 (최초 1회)
@@ -380,7 +380,7 @@ def get_action():
                 if wait_start_time is None: wait_start_time = time.time()
                 if time.time() - wait_start_time < 3.0:
                     return jsonify({"moveWS": {"command": "STOP", "weight": 1}, "moveAD": {"command": "", "weight": 0}, "turretQE": {"command": "", "weight": 0}, "turretRF": {"command": "", "weight": 0}, "fire": False})
-                
+
                 current_key_wp_index += 1
                 wait_start_time = None
 
@@ -391,7 +391,7 @@ def get_action():
                 FIRE_AIM_START = None
                 print("🔥 START FIRE MODE")
                 return jsonify({"moveWS": {"command": "STOP", "weight": 1}, "moveAD": {"command": "", "weight": 0}, "turretQE": {"command": "", "weight": 0}, "turretRF": {"command": "", "weight": 0}, "fire": False})
-            
+
             else:
                 current_key_wp_index += 1
 
@@ -424,7 +424,7 @@ def get_action():
     raw_fwd = 1.0 - (abs_diff / 60.0)
     fwd_weight = min(MAX_SPEED, max(0.3, raw_fwd))
     turn_weight = min(1.0, max(0.0, abs_diff * STEER_GAIN))
-    
+
     return jsonify({
         "moveWS":   {"command": "W", "weight": fwd_weight},
         "moveAD":   {"command": "D" if diff > 0 else "A", "weight": turn_weight},
@@ -459,7 +459,7 @@ def update_bullet():
 # 기타 API
 # ------------------------------------------------------------
 @app.route('/detect', methods=['POST'])
-def detect(): return jsonify([]) 
+def detect(): return jsonify([])
 @app.route('/info', methods=['POST'])
 def info(): return jsonify({"status": "success"})
 @app.route('/update_obstacle', methods=['POST'])
