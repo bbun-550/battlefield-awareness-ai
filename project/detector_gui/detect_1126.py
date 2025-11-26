@@ -76,12 +76,12 @@ class ScreenDetector:
         # [GIF 설정] Reload 애니메이션을 위한 변수 및 파일 로드
         # ---------------------------------------------------------
         self.gif_path = "reload.gif"
-        self.gif_frames = []      # GIF 프레임들을 저장할 리스트
-        self.is_reloading = False # 현재 리로딩 중인지 상태 플래그
-        self.reload_start_time = 0 # 리로딩 시작 시간
-        self.RELOAD_DURATION = 7.0 # 리로딩 지속 시간 (7초)
+        self.gif_frames = []        # GIF 프레임들을 저장할 리스트
+        self.is_reloading = False   # 현재 리로딩 중인지 상태 플래그
+        self.reload_start_time = 0  # 리로딩 시작 시간
+        self.RELOAD_DURATION = 7.0  # 리로딩 지속 시간 (7초)
         
-        self.load_gif_frames() # GIF 미리 로드 실행
+        self.load_gif_frames()      # GIF 미리 로드 실행
 
     def load_gif_frames(self):
         """ 
@@ -127,6 +127,7 @@ class ScreenDetector:
                             'y': float(pos.get('y', 0.0)), 
                             'z': float(pos.get('z', 0.0))
                         })
+                print(f"맵 데이터 로드 완료: {len(standardized_targets)}개 객체")
                 return standardized_targets
         except Exception as e:
             print(f"[오류] 맵 로딩 실패: {e}")
@@ -175,9 +176,9 @@ class ScreenDetector:
         enemies = red_cnt + tank_cnt
         if enemies > 0:
             if tank_cnt > 0:
-                return f" 위험: 적 전차 {tank_cnt}대 식별!"
+                return f" 위험! 적 전차 {tank_cnt}대 식별!"
             else:
-                return f" 경고: 적군 {red_cnt}명 접근 중"
+                return f" 경고! 적군 {red_cnt}명 접근 중"
         elif blue_cnt > 0:
             return f" 아군 {blue_cnt}명과 합류 가능"
         elif len(counts) > 0:
@@ -227,7 +228,7 @@ class ScreenDetector:
 
                 # 4. 맵 데이터와 탐지된 객체 매칭 (Matching Logic)
                 unique_classes = set(b['cls_name'] for b in current_frame_boxes)
-                total_counts = {} 
+                total_counts = {}
 
                 for cls_name in unique_classes:
                     # 해당 클래스의 박스들만 추출
@@ -414,7 +415,7 @@ class ScreenDetector:
         cv2.destroyAllWindows()
 
     def update_player_pos_from_server(self):
-        """Flask 서버(server_1125.py)의 /info에서 플레이어 위치를 가져옴"""
+        """Flask 서버(server_1126.py)의 /info에서 플레이어 위치를 가져옴"""
         try:
             resp = requests.get(f"{self.server_url}/info", timeout=0.2)
             if resp.status_code != 200:
