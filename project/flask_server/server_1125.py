@@ -3,6 +3,7 @@
 # [통합] A* Pathfinding + Pure Pursuit + Event Handling
 # ============================================================
 
+from pathlib import Path
 from flask import Flask, request, jsonify
 import math, os, time, json, heapq
 import numpy as np
@@ -447,6 +448,41 @@ def update_bullet():
 # ------------------------------------------------------------
 # 기타 API
 # ------------------------------------------------------------
+@app.route('/info', methods=['POST'])
+def info():
+    """
+    게임에서 POST 요청으로 보내준 플레이어 좌표(x, y, z)를 수신하여
+    탐지기 인스턴스의 player_pos 변수에 업데이트함.
+    """
+    global server_player_pos
+
+    try:
+        # JSON 데이터 파싱
+        data = request.get_json(force=True)
+        pos = data.get('playerPos', {})
+                
+        x = float(pos.get('x', 0.0))
+        y = float(pos.get('y', 0.0))
+        z = float(pos.get('z', 0.0)) 
+
+        # 좌표 업데이트
+        server_player_pos = [x, y, z]
+        return "OK", 200
+    except Exception as e:
+        print(f"Data Error: {e}")
+        return "Error", 400
+
+@app.route('/info', methods=['GET'])
+def info_get():
+    return jsonify({
+        "pos":{
+            "x":server_player_pos[0],
+            "y":server_player_pos[1],
+            "z":server_player_pos[2]
+        }
+    })
+
+
 @app.route('/detect', methods=['POST'])
 def detect(): return jsonify([]) 
 @app.route('/info', methods=['POST'])
