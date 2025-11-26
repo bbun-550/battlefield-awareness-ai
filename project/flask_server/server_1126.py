@@ -15,7 +15,7 @@ app = Flask(__name__)
 
 # 파일 경로
 OUTPUT_CSV  = "log_data/output.csv"
-MAP_FILE    = "map/11_25.map"
+MAP_FILE    = "map/11_25_notree.map"
 
 # server_player_pos 초기화
 server_player_pos = [0.0, 0.0, 0.0]
@@ -24,15 +24,10 @@ server_player_pos = [0.0, 0.0, 0.0]
 # WAYPOINT (주요 경유지)
 # ------------------------------------------------------------
 WAYPOINTS = [
-    (66.08732, 45.9379),   # [0] 회전 + 3초 정지
-    # (100.425, 106.330),    # [1]
-    # (81.277, 99.007),      # [2]
-    # (90.565, 130.413),     # [3]
-    # (111.759, 172.892),    # [4]
-    (120.389, 181.441),    # [5] → 포격모드 ON
-    (139.722, 258.477),    # [6]
-    (128.686, 291.084),    # [7]
-    (35.982, 284.198)      # [8]
+    (66.08732, 45.9379),    # [0] 회전 + 3초 정지
+    (120.389, 181.441),     # [1] 포격위치
+    (136.55, 287.67),       # [2]
+    (35.982, 284.198)       # [3]
 ]
 
 # ------------------------------------------------------------
@@ -59,7 +54,7 @@ TARGET_TANKS  = []  # 공격 대상 (Only Tank) -> 포격 계산용
 # A* Algorithm Implementation
 # ------------------------------------------------------------
 GRID_SIZE = 1.0       # 격자 크기 (1m)
-OBSTACLE_MARGIN = 5.5 # 장애물 안전 거리
+OBSTACLE_MARGIN = 7.0 # 장애물 안전 거리
 
 def world_to_grid(x, z):
     return int(round(x / GRID_SIZE)), int(round(z / GRID_SIZE))
@@ -360,18 +355,33 @@ def get_action():
         if dist_to_key < 3.5:
             # [0]번 WP: 회전 + 대기
             if current_key_wp_index == 0:
-                target_rot = 335.0
-                diff = normalize(target_rot - body_yaw)
+                target_rot = 335.0  # 목표 각도 (필요시 atan2로 좌표 계산 가능)
+                
+                # 차체(body_yaw) 대신 포탑(tx) 각도와의 차이를 계산
+                diff = normalize(target_rot - tx) 
+
+                # 각도 차이가 4도 이상이면 포탑 회전
                 if abs(diff) > 4.0:
                     return jsonify({
-                        "moveWS": {"command": "STOP", "weight": 1},
-                        "moveAD": {"command": "D" if diff > 0 else "A", "weight": min(0.4, max(0.1, abs(diff) * 0.02))},
-                        "turretQE": {"command": "", "weight": 0}, "turretRF": {"command": "", "weight": 0}, "fire": False
+                        "moveWS": {"command": "STOP", "weight": 1}, # 차체 전진/후진 정지
+                        "moveAD": {"command": "", "weight": 0},     # 차체 회전 정지
+                        # 포탑 회전 (diff가 양수면 E, 음수면 Q)
+                        "turretQE": {"command": "E" if diff > 0 else "Q", "weight": min(0.4, max(0.1, abs(diff) * 0.02))},
+                        "turretRF": {"command": "", "weight": 0}, 
+                        "fire": False
                     })
+                
+                # 포탑 정렬 완료 후 3초 대기
                 if wait_start_time is None: wait_start_time = time.time()
                 if time.time() - wait_start_time < 3.0:
-                    return jsonify({"moveWS": {"command": "STOP", "weight": 1}, "moveAD": {"command": "", "weight": 0}, "turretQE": {"command": "", "weight": 0}, "turretRF": {"command": "", "weight": 0}, "fire": False})
-                
+                    return jsonify({
+                        "moveWS": {"command": "STOP", "weight": 1}, 
+                        "moveAD": {"command": "", "weight": 0}, 
+                        "turretQE": {"command": "", "weight": 0}, # 대기 중에는 포탑도 정지
+                        "turretRF": {"command": "", "weight": 0}, 
+                        "fire": False
+                    })
+                RECENTER_TURRET = True
                 current_key_wp_index += 1
                 wait_start_time = None
 
@@ -390,9 +400,9 @@ def get_action():
     # 4. 주행 제어 (A* Path + Drift Driving)
     # ---------------------------------------------
     MAX_SPEED = 0.6
-    LOOK_DIST = 4.5
+    LOOK_DIST = 3.5
     STEER_GAIN = 0.04
-    PIVOT_LIMIT = 45.0
+    PIVOT_LIMIT = 60.0
 
     target_x, target_z = get_lookahead_target_from_path(px, pz, LOOK_DIST)
 
