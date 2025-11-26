@@ -10,7 +10,7 @@ import pandas as pd
 
 # ------------------------------------------------------------
 # 기본 설정
-# ------------------------------------------------------------v
+# ------------------------------------------------------------
 app = Flask(__name__)
 
 # 파일 경로
@@ -279,8 +279,8 @@ def compute_solution(px, py, pz, tx, ty):
 
 def turret_ctrl(cx, cy, tx, ty):
     ex, ey = normalize(tx - cx), ty - cy
-    return {"QE": {"command": "E" if ex > 0 else "Q" if ex < 0 else "", "weight": min(abs(ex) * 0.15, 1.0)},
-            "RF": {"command": "R" if ey > 0 else "F" if ey < 0 else "", "weight": min(abs(ey) * 0.45, 1.0)}, "ex": ex, "ey": ey}
+    return {"QE": {"command": "E" if ex > 0 else "Q" if ex < 0 else "", "weight": min(abs(ex) * 0.05, 1.0)},
+            "RF": {"command": "R" if ey > 0 else "F" if ey < 0 else "", "weight": min(abs(ey) * 0.2, 1.0)}, "ex": ex, "ey": ey}
 
 def aim_good_enough(ex, ey): return abs(ex) < 3.0 and abs(ey) < 3.0
 
@@ -300,7 +300,7 @@ def get_action():
     px, py, pz = float(pos.get("x", 0)), float(pos.get("y", 0)), float(pos.get("z", 0))
     tx, ty = float(turret.get("x", 0)), float(turret.get("y", 0))
 
-
+    # print(f"WP_IDX:{current_key_wp_index}, FIRE_MODE:{FIRE_MODE}, RECENTER:{RECENTER_TURRET}")
     body_yaw = CURRENT_BODY_YAW
     if body_yaw is None: 
         body_yaw = tx 
@@ -342,7 +342,7 @@ def get_action():
         if abs(yaw_err) > 3.0:
             return jsonify({
                 "moveWS": {"command": "STOP", "weight": 1}, "moveAD": {"command": "", "weight": 0},
-                "turretQE": {"command": "E" if yaw_err > 0 else "Q", "weight": min(abs(yaw_err) * 0.15, 1.0)},
+                "turretQE": {"command": "E" if yaw_err > 0 else "Q", "weight": min(abs(yaw_err) * 0.05, 1.0)},
                 "turretRF": {"command": "", "weight": 0}, "fire": False
             })
         RECENTER_TURRET = False

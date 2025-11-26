@@ -76,12 +76,12 @@ class ScreenDetector:
         # [GIF 설정] Reload 애니메이션을 위한 변수 및 파일 로드
         # ---------------------------------------------------------
         self.gif_path = "reload.gif"
-        self.gif_frames = []      # GIF 프레임들을 저장할 리스트
-        self.is_reloading = False # 현재 리로딩 중인지 상태 플래그
-        self.reload_start_time = 0 # 리로딩 시작 시간
-        self.RELOAD_DURATION = 7.0 # 리로딩 지속 시간 (7초)
+        self.gif_frames = []        # GIF 프레임들을 저장할 리스트
+        self.is_reloading = False   # 현재 리로딩 중인지 상태 플래그
+        self.reload_start_time = 0  # 리로딩 시작 시간
+        self.RELOAD_DURATION = 7.0  # 리로딩 지속 시간 (7초)
         
-        self.load_gif_frames() # GIF 미리 로드 실행
+        self.load_gif_frames()      # GIF 미리 로드 실행
 
     def load_gif_frames(self):
         """ 
@@ -127,6 +127,7 @@ class ScreenDetector:
                             'y': float(pos.get('y', 0.0)), 
                             'z': float(pos.get('z', 0.0))
                         })
+                print(f"맵 데이터 로드 완료: {len(standardized_targets)}개 객체")
                 return standardized_targets
         except Exception as e:
             print(f"[오류] 맵 로딩 실패: {e}")
