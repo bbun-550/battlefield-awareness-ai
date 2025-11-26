@@ -16,14 +16,10 @@ import pandas as pd
 app = Flask(__name__)
 
 # 파일 경로 (사용자 환경에 맞게 확인 필요)
-<<<<<<< HEAD
 OUTPUT_CSV  = "log_data/output.csv"
 MAP_FILE    = "map/11_24_tuning.map"
-=======
-LOG_FILE    = r"C:\\Users\\cheei\\Documents\\Tank Challenge\\log_data\\tank_info_log.txt"
-OUTPUT_CSV  = pd.read_csv("data/output.csv")
-MAP_FILE    = "flask_server/map/11_24_tuning.map"
->>>>>>> 6fc0b79 (251125 /flask_server/data/out.csv 추가, docker-compose.yml 수정)
+OUTPUT_CSV  = "flask_server/data/output.csv"
+MAP_FILE    = "flask_server/map/11_25.map"
 
 # ------------------------------------------------------------
 # WAYPOINT (주요 경유지)
@@ -267,7 +263,7 @@ def ballistic_pitch(sx, sy, sz, tx, ty, tz):
 
 def angle_from_csv(d):
     if not os.path.exists(OUTPUT_CSV): return False, None
-    df = OUTPUT_CSV
+    df = pd.read_csv(OUTPUT_CSV)
     arr = df.to_numpy()
     ang, Z = arr[:, 0], arr[:, 3]
     idx = np.argsort(Z)
@@ -304,7 +300,6 @@ def get_action():
     turret = req.get("turret", {})
     px, py, pz = float(pos.get("x", 0)), float(pos.get("y", 0)), float(pos.get("z", 0))
     tx, ty = float(turret.get("x", 0)), float(turret.get("y", 0))
-
 
     body_yaw = CURRENT_BODY_YAW
     if body_yaw is None: 
@@ -435,7 +430,7 @@ def get_action():
 @app.route("/update_bullet", methods=["POST"])
 def update_bullet():
     global FIRE_MODE, FIRE_COUNT, current_key_wp_index, RECENTER_TURRET, FIRE_AIM_START
-    data = request.get_json(force=True) or {}
+    # data = request.get_json(force=True) or {}
     if not FIRE_MODE: return jsonify({"status": "ignored"})
 
     FIRE_COUNT += 1
