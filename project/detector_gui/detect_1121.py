@@ -17,7 +17,7 @@ from PIL import ImageFont, ImageDraw, Image, ImageSequence
 # Flask의 불필요한 로그 출력 끄기
 
 class ScreenDetector:
-    def __init__(self, model_path='5cls_v6_case9_best.pt', server_url='http://127.0.0.1:5000'):
+    def __init__(self, model_path=r'5cls_v6_case9_best.pt', server_url='http://127.0.0.1:5000'):
         # ---------------------------------------------------------
         # [초기화] 화면 캡처, 모델 로드, 설정값 정의
         # ---------------------------------------------------------
@@ -437,6 +437,6 @@ class ScreenDetector:
 
 
 if __name__ == "__main__":
-    MODEL_FILE_PATH = 'detector_gui/weights/5cls_v6_case9_best.pt'
+    MODEL_FILE_PATH = '5cls_v6_case9_best.pt'
     detector_instance = ScreenDetector(model_path=MODEL_FILE_PATH)
     detector_instance.run_detection()

@@ -7,17 +7,16 @@ from flask import Flask, request, jsonify
 import math, os, time, json, heapq
 import numpy as np
 import pandas as pd
-from ultralytics import YOLO
+
 
 # ------------------------------------------------------------
 # 기본 설정
-# ------------------------------------------------------------
+# ------------------------------------------------------------v
 app = Flask(__name__)
 
 # 파일 경로 (사용자 환경에 맞게 확인 필요)
-LOG_FILE    = r"C:\\Users\\cheei\\Documents\\Tank Challenge\\log_data\\tank_info_log.txt"
-OUTPUT_CSV  = r"C:\\Users\\cheei\\Documents\\Tank Challenge\\log_data\\output.csv"
-MAP_FILE    = r"11_24_tuning.map"
+OUTPUT_CSV  = "log_data/output.csv"
+MAP_FILE    = "map/11_24_tuning.map"
 
 # ------------------------------------------------------------
 # WAYPOINT (주요 경유지)
@@ -48,6 +47,7 @@ FIRE_MODE       = False
 FIRE_COUNT      = 0
 RECENTER_TURRET = False
 FIRE_AIM_START  = None
+CURRENT_BODY_YAW = None
 
 # 맵 정보 리스트 분리
 ALL_OBSTACLES = []  # 이동 방해물 (Tank, Car, Rock) -> A* 경로 계산용
@@ -57,7 +57,7 @@ TARGET_TANKS  = []  # 공격 대상 (Only Tank)        -> 포격 계산용
 # A* Algorithm Implementation
 # ------------------------------------------------------------
 GRID_SIZE = 1.0       # 격자 크기 (1m)
-OBSTACLE_MARGIN = 4.0 # 장애물 안전 거리
+OBSTACLE_MARGIN = 5.5 # 장애물 안전 거리
 
 def world_to_grid(x, z):
     return int(round(x / GRID_SIZE)), int(round(z / GRID_SIZE))
@@ -212,19 +212,6 @@ load_map()
 def normalize(a: float) -> float:
     return (a + 180.0) % 360.0 - 180.0
 
-def read_body_yaw_from_log():
-    if not os.path.exists(LOG_FILE): return None
-    try:
-        with open(LOG_FILE, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-        if not lines: return None
-        last = lines[-1]
-        for token in last.replace("{", " ").replace("}", " ").split(","):
-            if "Player_Body_X" in token:
-                return float(token.split(":")[1])
-    except: pass
-    return None
-
 def get_lookahead_target_from_path(px, pz, lookahead=6.0):
     global FINAL_PATH
     if not FINAL_PATH: return (px, pz)
@@ -303,7 +290,7 @@ FIRST_FIRE_DELAY = 0.6
 @app.route("/get_action", methods=["POST"])
 def get_action():
     global current_key_wp_index, FIRE_MODE, FIRE_COUNT, FINAL_PATH, path_generated
-    global RECENTER_TURRET, wait_start_time, FIRE_AIM_START
+    global RECENTER_TURRET, wait_start_time, FIRE_AIM_START, CURRENT_BODY_YAW
 
     req    = request.get_json(force=True) or {}
     pos    = req.get("position", {})
@@ -311,8 +298,10 @@ def get_action():
     px, py, pz = float(pos.get("x", 0)), float(pos.get("y", 0)), float(pos.get("z", 0))
     tx, ty = float(turret.get("x", 0)), float(turret.get("y", 0))
 
-    body_yaw = read_body_yaw_from_log()
-    if body_yaw is None: body_yaw = tx 
+
+    body_yaw = CURRENT_BODY_YAW
+    if body_yaw is None: 
+        body_yaw = tx 
 
     # ---------------------------------------------
     # 0. 초기화: A* 경로 생성 (최초 1회)
@@ -399,7 +388,7 @@ def get_action():
     # 4. 주행 제어 (A* Path + Drift Driving)
     # ---------------------------------------------
     MAX_SPEED = 0.6
-    LOOK_DIST = 10.0
+    LOOK_DIST = 4.5
     STEER_GAIN = 0.04
     PIVOT_LIMIT = 45.0
 
@@ -461,7 +450,21 @@ def update_bullet():
 @app.route('/detect', methods=['POST'])
 def detect(): return jsonify([]) 
 @app.route('/info', methods=['POST'])
-def info(): return jsonify({"status": "success"})
+def info():
+    global CURRENT_BODY_YAW
+    try:
+        # JSON 데이터 파싱
+        req = request.get_json(force=True) or {}
+        
+        # JSON 구조에서 바로 playerBodyX 추출
+        if "playerBodyX" in req:
+            CURRENT_BODY_YAW = float(req["playerBodyX"])
+            
+    except Exception as e:
+        print(f"Error processing info: {e}")
+        
+    return jsonify({"status": "success"})
+
 @app.route('/update_obstacle', methods=['POST'])
 def update_obstacle(): return jsonify({'status': 'success'})
 @app.route('/collision', methods=['POST'])
@@ -473,4 +476,3 @@ def start(): return jsonify({"control": ""})
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
-
