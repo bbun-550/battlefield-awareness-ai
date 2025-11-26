@@ -3,11 +3,11 @@
 # [통합] A* Pathfinding + Pure Pursuit + Event Handling
 # ============================================================
 
+from pathlib import Path
 from flask import Flask, request, jsonify
 import math, os, time, json, heapq
 import numpy as np
 import pandas as pd
-from ultralytics import YOLO
 
 # ------------------------------------------------------------
 # 기본 설정
@@ -15,9 +15,11 @@ from ultralytics import YOLO
 app = Flask(__name__)
 
 # 파일 경로 (사용자 환경에 맞게 확인 필요)
-LOG_FILE    = r"C:\\Users\\cheei\\Documents\\Tank Challenge\\log_data\\tank_info_log.txt"
-OUTPUT_CSV  = r"C:\\Users\\cheei\\Documents\\Tank Challenge\\log_data\\output.csv"
-MAP_FILE    = r"11_24_tuning.map"
+current_dir = Path(__file__).resolve().parent
+base_dir = current_dir.parent.parent
+LOG_FILE = base_dir / "Documents" / "Tank Challenge" / "log_data" / "tank_info_log.txt"
+OUTPUT_CSV = base_dir / "Documents" / "Tank Challenge" / "log_data" / "output.csv"
+MAP_FILE = current_dir / "project" / "flask_server" / "map" / "11_25.map"
 
 # ------------------------------------------------------------
 # WAYPOINT (주요 경유지)
@@ -458,10 +460,43 @@ def update_bullet():
 # ------------------------------------------------------------
 # 기타 API
 # ------------------------------------------------------------
-@app.route('/detect', methods=['POST'])
-def detect(): return jsonify([]) 
 @app.route('/info', methods=['POST'])
-def info(): return jsonify({"status": "success"})
+def info():
+    """
+    게임에서 POST 요청으로 보내준 플레이어 좌표(x, y, z)를 수신하여
+    탐지기 인스턴스의 player_pos 변수에 업데이트함.
+    """
+    global server_player_pos
+
+    try:
+        # JSON 데이터 파싱
+        data = request.get_json(force=True)
+        pos = data.get('playerPos', {})
+                
+        x = float(pos.get('x', 0.0))
+        y = float(pos.get('y', 0.0))
+        z = float(pos.get('z', 0.0)) 
+
+        # 좌표 업데이트
+        server_player_pos = [x, y, z]
+        return "OK", 200
+    except Exception as e:
+        print(f"Data Error: {e}")
+        return "Error", 400
+
+@app.route('/info', methods=['GET'])
+def info_get():
+    return jsonify({
+        "pos":{
+            "x":server_player_pos[0],
+            "y":server_player_pos[1],
+            "z":server_player_pos[2]
+        }
+    })
+
+
+@app.route('/detect', methods=['POST'])
+def detect(): return jsonify([])
 @app.route('/update_obstacle', methods=['POST'])
 def update_obstacle(): return jsonify({'status': 'success'})
 @app.route('/collision', methods=['POST'])
