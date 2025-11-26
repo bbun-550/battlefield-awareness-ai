@@ -3,21 +3,21 @@
 # [통합] A* Pathfinding + Pure Pursuit + Event Handling
 # ============================================================
 
+from pathlib import Path
 from flask import Flask, request, jsonify
 import math, os, time, json, heapq
 import numpy as np
 import pandas as pd
-# from ultralytics import YOLO
+
 
 # ------------------------------------------------------------
 # 기본 설정
-# ------------------------------------------------------------
+# ------------------------------------------------------------v
 app = Flask(__name__)
 
 # 파일 경로 (사용자 환경에 맞게 확인 필요)
-LOG_FILE    = r"C:\Users\SeYun\anaconda3\envs\tf\TC\Tank Challenge\log_data\tank_info_log.txt"
-OUTPUT_CSV  = r"C:\Users\SeYun\anaconda3\envs\tf\TC\Tank Challenge\log_data\output.csv"
-MAP_FILE    = r"11_24_tuning.map"
+OUTPUT_CSV  = "log_data/output.csv"
+MAP_FILE    = "map/11_24_tuning.map"
 
 # ------------------------------------------------------------
 # WAYPOINT (주요 경유지)
@@ -48,6 +48,7 @@ FIRE_MODE       = False
 FIRE_COUNT      = 0
 RECENTER_TURRET = False
 FIRE_AIM_START  = None
+CURRENT_BODY_YAW = None
 
 # 맵 정보 리스트 분리
 ALL_OBSTACLES = []  # 이동 방해물 (Tank, Car, Rock) -> A* 경로 계산용
@@ -57,7 +58,7 @@ TARGET_TANKS  = []  # 공격 대상 (Only Tank)        -> 포격 계산용
 # A* Algorithm Implementation
 # ------------------------------------------------------------
 GRID_SIZE = 1.0       # 격자 크기 (1m)
-OBSTACLE_MARGIN = 4.0 # 장애물 안전 거리
+OBSTACLE_MARGIN = 5.5 # 장애물 안전 거리
 
 def world_to_grid(x, z):
     return int(round(x / GRID_SIZE)), int(round(z / GRID_SIZE))
@@ -69,7 +70,7 @@ def get_blocked_cells(obstacles):
     blocked = set()
     margin_steps = int(math.ceil(OBSTACLE_MARGIN / GRID_SIZE))
     print(f"🛠️ Building Obstacle Map with {len(obstacles)} objects...")
-
+    
     for ob in obstacles:
         ox, oz = ob['x'], ob['z']
         gr, gc = world_to_grid(ox, oz)
@@ -87,15 +88,15 @@ def heuristic(a, b):
 def a_star_search(start_pos, end_pos, blocked_cells):
     start_node = world_to_grid(*start_pos)
     end_node   = world_to_grid(*end_pos)
-
+    
     neighbors = [(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]
     open_set = []
     heapq.heappush(open_set, (0, start_node))
-
+    
     came_from = {}
     g_score = {start_node: 0}
     f_score = {start_node: heuristic(start_node, end_node)}
-
+    
     best_node = start_node
     min_dist_to_goal = heuristic(start_node, end_node)
 
@@ -121,7 +122,7 @@ def a_star_search(start_pos, end_pos, blocked_cells):
         for dx, dy in neighbors:
             neighbor = (current[0] + dx, current[1] + dy)
             if neighbor in blocked_cells: continue
-
+            
             move_cost = 1.414 if dx != 0 and dy != 0 else 1.0
             tentative_g = g_score[current] + move_cost
 
@@ -130,7 +131,7 @@ def a_star_search(start_pos, end_pos, blocked_cells):
                 g_score[neighbor] = tentative_g
                 f_score[neighbor] = tentative_g + heuristic(neighbor, end_node)
                 heapq.heappush(open_set, (f_score[neighbor], neighbor))
-
+    
     print("⚠️ A* Path Not Found to exact target. Using closest approach.")
     path = []
     curr = best_node
@@ -145,11 +146,11 @@ def a_star_search(start_pos, end_pos, blocked_cells):
 def generate_full_path(start_x, start_z):
     """ 전체 경로 생성기 """
     global FINAL_PATH, WAYPOINTS, ALL_OBSTACLES
-
+    
     print("🗺️ Generating Full A* Path...")
     # [수정됨] 이동 시에는 모든 장애물(Tank, Car, Rock)을 피함
     blocked = get_blocked_cells(ALL_OBSTACLES)
-
+    
     full_path = [(start_x, start_z)]
     current_pos = (start_x, start_z)
 
@@ -181,12 +182,12 @@ def load_map():
         data = json.load(f)
 
     # 장애물로 인식할 키워드 (이동 방해물)
-    OBSTACLE_KEYWORDS = ["tank", "car", "rock"]
+    OBSTACLE_KEYWORDS = ["tank", "car", "rock"] 
 
     for ob in data.get("obstacles", []):
         name = str(ob.get("prefabName", "")).lower()
         pos = ob.get("position", {})
-
+        
         obj_data = {
             "name": ob.get("prefabName", "Unknown"),
             "x": float(pos.get("x", 0.0)),
@@ -212,26 +213,13 @@ load_map()
 def normalize(a: float) -> float:
     return (a + 180.0) % 360.0 - 180.0
 
-def read_body_yaw_from_log():
-    if not os.path.exists(LOG_FILE): return None
-    try:
-        with open(LOG_FILE, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-        if not lines: return None
-        last = lines[-1]
-        for token in last.replace("{", " ").replace("}", " ").split(","):
-            if "Player_Body_X" in token:
-                return float(token.split(":")[1])
-    except: pass
-    return None
-
 def get_lookahead_target_from_path(px, pz, lookahead=6.0):
     global FINAL_PATH
     if not FINAL_PATH: return (px, pz)
 
     closest_idx = 0
     min_dist = 9999.0
-
+    
     for i, (nx, nz) in enumerate(FINAL_PATH):
         d = math.hypot(nx - px, nz - pz)
         if d < min_dist:
@@ -243,7 +231,7 @@ def get_lookahead_target_from_path(px, pz, lookahead=6.0):
         d = math.hypot(nx - px, nz - pz)
         if d >= lookahead:
             return (nx, nz)
-
+    
     return FINAL_PATH[-1]
 
 # ------------------------------------------------------------
@@ -298,12 +286,12 @@ def aim_good_enough(ex, ey): return abs(ex) < 3.0 and abs(ey) < 3.0
 # ------------------------------------------------------------
 # GET_ACTION (MAIN LOGIC)
 # ------------------------------------------------------------
-FIRST_FIRE_DELAY = 0.6
+FIRST_FIRE_DELAY = 0.6 
 
 @app.route("/get_action", methods=["POST"])
 def get_action():
     global current_key_wp_index, FIRE_MODE, FIRE_COUNT, FINAL_PATH, path_generated
-    global RECENTER_TURRET, wait_start_time, FIRE_AIM_START
+    global RECENTER_TURRET, wait_start_time, FIRE_AIM_START, CURRENT_BODY_YAW
 
     req    = request.get_json(force=True) or {}
     pos    = req.get("position", {})
@@ -311,8 +299,10 @@ def get_action():
     px, py, pz = float(pos.get("x", 0)), float(pos.get("y", 0)), float(pos.get("z", 0))
     tx, ty = float(turret.get("x", 0)), float(turret.get("y", 0))
 
-    body_yaw = read_body_yaw_from_log()
-    if body_yaw is None: body_yaw = tx
+
+    body_yaw = CURRENT_BODY_YAW
+    if body_yaw is None: 
+        body_yaw = tx 
 
     # ---------------------------------------------
     # 0. 초기화: A* 경로 생성 (최초 1회)
@@ -380,7 +370,7 @@ def get_action():
                 if wait_start_time is None: wait_start_time = time.time()
                 if time.time() - wait_start_time < 3.0:
                     return jsonify({"moveWS": {"command": "STOP", "weight": 1}, "moveAD": {"command": "", "weight": 0}, "turretQE": {"command": "", "weight": 0}, "turretRF": {"command": "", "weight": 0}, "fire": False})
-
+                
                 current_key_wp_index += 1
                 wait_start_time = None
 
@@ -391,7 +381,7 @@ def get_action():
                 FIRE_AIM_START = None
                 print("🔥 START FIRE MODE")
                 return jsonify({"moveWS": {"command": "STOP", "weight": 1}, "moveAD": {"command": "", "weight": 0}, "turretQE": {"command": "", "weight": 0}, "turretRF": {"command": "", "weight": 0}, "fire": False})
-
+            
             else:
                 current_key_wp_index += 1
 
@@ -399,7 +389,7 @@ def get_action():
     # 4. 주행 제어 (A* Path + Drift Driving)
     # ---------------------------------------------
     MAX_SPEED = 0.6
-    LOOK_DIST = 10.0
+    LOOK_DIST = 4.5
     STEER_GAIN = 0.04
     PIVOT_LIMIT = 45.0
 
@@ -424,7 +414,7 @@ def get_action():
     raw_fwd = 1.0 - (abs_diff / 60.0)
     fwd_weight = min(MAX_SPEED, max(0.3, raw_fwd))
     turn_weight = min(1.0, max(0.0, abs_diff * STEER_GAIN))
-
+    
     return jsonify({
         "moveWS":   {"command": "W", "weight": fwd_weight},
         "moveAD":   {"command": "D" if diff > 0 else "A", "weight": turn_weight},
@@ -458,10 +448,59 @@ def update_bullet():
 # ------------------------------------------------------------
 # 기타 API
 # ------------------------------------------------------------
-@app.route('/detect', methods=['POST'])
-def detect(): return jsonify([])
 @app.route('/info', methods=['POST'])
-def info(): return jsonify({"status": "success"})
+def info():
+    """
+    게임에서 POST 요청으로 보내준 플레이어 좌표(x, y, z)를 수신하여
+    탐지기 인스턴스의 player_pos 변수에 업데이트함.
+    """
+    global server_player_pos
+
+    try:
+        # JSON 데이터 파싱
+        data = request.get_json(force=True)
+        pos = data.get('playerPos', {})
+                
+        x = float(pos.get('x', 0.0))
+        y = float(pos.get('y', 0.0))
+        z = float(pos.get('z', 0.0)) 
+
+        # 좌표 업데이트
+        server_player_pos = [x, y, z]
+        return "OK", 200
+    except Exception as e:
+        print(f"Data Error: {e}")
+        return "Error", 400
+
+@app.route('/info', methods=['GET'])
+def info_get():
+    return jsonify({
+        "pos":{
+            "x":server_player_pos[0],
+            "y":server_player_pos[1],
+            "z":server_player_pos[2]
+        }
+    })
+
+
+@app.route('/detect', methods=['POST'])
+def detect(): return jsonify([]) 
+@app.route('/info', methods=['POST'])
+def info():
+    global CURRENT_BODY_YAW
+    try:
+        # JSON 데이터 파싱
+        req = request.get_json(force=True) or {}
+        
+        # JSON 구조에서 바로 playerBodyX 추출
+        if "playerBodyX" in req:
+            CURRENT_BODY_YAW = float(req["playerBodyX"])
+            
+    except Exception as e:
+        print(f"Error processing info: {e}")
+        
+    return jsonify({"status": "success"})
+
 @app.route('/update_obstacle', methods=['POST'])
 def update_obstacle(): return jsonify({'status': 'success'})
 @app.route('/collision', methods=['POST'])
@@ -473,4 +512,3 @@ def start(): return jsonify({"control": ""})
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
-
