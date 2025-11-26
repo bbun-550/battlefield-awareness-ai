@@ -3,8 +3,8 @@ import cv2
 import numpy as np
 from mss import mss
 from ultralytics import YOLO
-import math 
-import json 
+import math
+import json
 import os
 import time
 import requests
@@ -29,13 +29,13 @@ from PIL import ImageFont, ImageDraw, Image
 #     try:
 #         data = request.get_json(force=True)
 #         player_pos_data = data.get('playerPos', {})
-        
+
 #         x = float(player_pos_data.get('x', 0.0))
 #         y = float(player_pos_data.get('y', 0.0))
-#         z = float(player_pos_data.get('z', 0.0)) 
+#         z = float(player_pos_data.get('z', 0.0))
 
-#         detector_instance.player_pos = [x, y, z] 
-        
+#         detector_instance.player_pos = [x, y, z]
+
 #         return "OK", 200
 #     except Exception as e:
 #         print(f"Data Error: {e}")
@@ -45,11 +45,11 @@ class ScreenDetector:
     def __init__(self, model_path='5cls_v5_2_case2_best.pt', server_url='http://127.0.0.1:5000'):
         self.server_url = server_url
         self.player_pos = [0.0, 0.0, 0.0]
-        
+
         # 화면 해상도 설정 (기본 FHD)
         self.screen_width = 1920
         self.screen_height = 1080
-        
+
         # ======================
         # self.sct = mss()
         # mon = self.sct.monitors[1]   # 실제 물리 모니터
@@ -62,7 +62,7 @@ class ScreenDetector:
         #     "left": mon["left"],
         #     "width": mon["width"],
         #     "height": mon["height"]
-        # }        
+        # }
         self.monitor = {"top": 0, "left": 0, "width": self.screen_width, "height": self.screen_height}
         self.sct = mss()
         # ========================
@@ -71,12 +71,12 @@ class ScreenDetector:
         full_model_path = os.path.join(base_path, model_path)
         if not os.path.exists(full_model_path):
             full_model_path = model_path
-            
+
         self.model = YOLO(full_model_path)
         self.class_names = self.model.names
-        
-        self.FOCAL_LENGTH_PX = 1000 
-        
+
+        self.FOCAL_LENGTH_PX = 1000
+
         # [최종 보정값]
         self.KNOWN_WIDTH_M = {
             0: 1.6,   # Red (사람)
@@ -85,19 +85,19 @@ class ScreenDetector:
             3: 15.2,  # Rock
             4: 13.7   # Tank
         }
-        
-        self.MAX_DRAW_DISTANCE_M = 200.0 
-        
+
+        self.MAX_DRAW_DISTANCE_M = 200.0
+
         self.TARGET_FILE_PATH = 'flask_server/map/11_20.map'
-        self.player_pos = [0.0, 0.0, 0.0] 
+        self.player_pos = [0.0, 0.0, 0.0]
         self.map_data_cache = self.load_target_coordinates()
-        
+
         # [한글 폰트 설정]
         self.font_path = "C:/Windows/Fonts/malgun.ttf"
-        self.bold_font_path = "C:/Windows/Fonts/malgunbd.ttf" 
-        
+        self.bold_font_path = "C:/Windows/Fonts/malgunbd.ttf"
+
         try:
-            self.font = ImageFont.truetype(self.font_path, 20) 
+            self.font = ImageFont.truetype(self.font_path, 20)
             if os.path.exists(self.bold_font_path):
                 self.font_bold = ImageFont.truetype(self.bold_font_path, 20)
             else:
@@ -112,23 +112,23 @@ class ScreenDetector:
         if not os.path.exists(self.TARGET_FILE_PATH):
             print(f"[오류] 맵 파일을 찾을 수 없습니다: {self.TARGET_FILE_PATH}")
             return []
-            
+
         try:
             with open(self.TARGET_FILE_PATH, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 obstacles = data.get('obstacles', [])
-                
+
                 standardized_targets = []
                 for obj in obstacles:
                     if 'prefabName' in obj and 'position' in obj:
                         pos = obj['position']
                         full_name = obj['prefabName']
-                        
+
                         standardized_targets.append({
-                            'id': full_name, 
+                            'id': full_name,
                             'prefabName': full_name.lower(),
                             'x': float(pos.get('x', 0.0)),
-                            'y': float(pos.get('y', 0.0)), 
+                            'y': float(pos.get('y', 0.0)),
                             'z': float(pos.get('z', 0.0))
                         })
                 print(f"맵 데이터 로드 완료: {len(standardized_targets)}개 객체")
@@ -146,8 +146,8 @@ class ScreenDetector:
 
     def calculate_real_distance(self, p_pos, t_obj):
         return math.sqrt(
-            (p_pos[0] - t_obj['x'])**2 + 
-            (p_pos[1] - t_obj['y'])**2 + 
+            (p_pos[0] - t_obj['x'])**2 +
+            (p_pos[1] - t_obj['y'])**2 +
             (p_pos[2] - t_obj['z'])**2
         )
 
@@ -164,7 +164,7 @@ class ScreenDetector:
 
     def run_detection(self):
         print("객체 탐지 시작... (HUD 총합 표시 및 자동 크기 조절)")
-        
+
         CAR_FILTERS = ['car001', 'car002', 'car003', 'car004', 'car005']
         ROCK_FILTERS = ['rock001', 'rock002']
         TANK_FILTERS = ['tank001']
@@ -177,35 +177,35 @@ class ScreenDetector:
                 img_mss = self.sct.grab(self.monitor)
                 img = np.array(img_mss)
                 frame = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-                
+
                 results = self.model(frame, verbose=False, conf=0.5, iou=0.45)
-                
+
                 current_frame_boxes = []
                 for box in results[0].boxes:
                     x1, y1, x2, y2 = map(int, box.xyxy[0])
                     cls_id = int(box.cls[0])
                     cls_name = self.class_names.get(cls_id, 'unknown')
                     sim_dist = self.calculate_sim_distance(cls_id, x1, x2)
-                    
+
                     if sim_dist > self.MAX_DRAW_DISTANCE_M: continue
-                    
+
                     current_frame_boxes.append({
                         'bbox': (x1, y1, x2, y2),
                         'cls_id': cls_id,
                         'cls_name': cls_name,
                         'sim_dist': sim_dist,
-                        'matched_map_obj': None 
+                        'matched_map_obj': None
                     })
 
                 unique_classes = set(b['cls_name'] for b in current_frame_boxes)
-                
+
                 # 개수 카운팅 (탐지된 박스 기준)
-                total_counts = {} 
+                total_counts = {}
 
                 for cls_name in unique_classes:
                     cls_boxes = [b for b in current_frame_boxes if b['cls_name'] == cls_name]
                     total_counts[cls_name] = len(cls_boxes)
-                    
+
                     cls_lower = cls_name.lower()
                     relevant_map_objs = []
                     for m_obj in self.map_data_cache:
@@ -222,7 +222,7 @@ class ScreenDetector:
                             if any(f in map_prefab for f in TANK_FILTERS): is_match = True
                         elif cls_lower == 'rock':
                              if any(f in map_prefab for f in ROCK_FILTERS): is_match = True
-                        
+
                         if is_match:
                             dist = self.calculate_real_distance(self.player_pos, m_obj)
                             if dist <= 500.0:
@@ -240,16 +240,16 @@ class ScreenDetector:
                                 'box_idx': box_idx,
                                 'map_idx': map_idx
                             })
-                    
+
                     match_candidates.sort(key=lambda x: x['diff'])
-                    
+
                     used_boxes = set()
                     used_maps = set()
-                    
+
                     for cand in match_candidates:
                         b_idx = cand['box_idx']
                         m_idx = cand['map_idx']
-                        
+
                         if b_idx not in used_boxes and m_idx not in used_maps:
                             cls_boxes[b_idx]['matched_map_obj'] = relevant_map_objs[m_idx]
                             used_boxes.add(b_idx)
@@ -269,7 +269,7 @@ class ScreenDetector:
                                 box['matched_map_obj'] = best_approx
 
                 hud_text_list = []
-                
+
                 # 1. 박스 그리기 (OpenCV)
                 for box in current_frame_boxes:
                     x1, y1, x2, y2 = box['bbox']
@@ -281,113 +281,113 @@ class ScreenDetector:
                 if self.font_bold is not None:
                     # OpenCV BGR -> PIL RGB 변환
                     img_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-                    
+
                     # 투명도 처리를 위해 RGBA 모드로 변환
                     img_pil = img_pil.convert("RGBA")
-                    
+
                     # 투명 레이어 생성 (여기다가 반투명 박스 그림)
                     overlay = Image.new('RGBA', img_pil.size, (0, 0, 0, 0))
                     draw = ImageDraw.Draw(overlay)
-                    
+
                     # 객체 라벨링 (이전과 동일)
                     current_frame_boxes.sort(key=lambda x: x['sim_dist'])
-                    counters = {} 
+                    counters = {}
 
                     for box in current_frame_boxes:
                         x1, y1, x2, y2 = box['bbox']
                         cls_name = box['cls_name']
-                        
+
                         if cls_name not in counters: counters[cls_name] = 1
                         simple_name = f"{cls_name.capitalize()} {counters[cls_name]}"
                         counters[cls_name] += 1
 
                         bgr = self.get_fixed_color(cls_name)
                         name_color_rgb = (bgr[2], bgr[1], bgr[0])
-                        
+
                         map_obj = box['matched_map_obj']
-                        
+
                         if map_obj:
                             real_d = map_obj['real_dist']
                             label_name = simple_name
                             label_dist = f"R : {real_d:.1f}m"
-                            
+
                             id_str = f"{simple_name} : {real_d:.1f}m"
                             if id_str not in hud_text_list:
                                 hud_text_list.append(id_str)
 
                             # 이름
                             draw.text((x1, y1-25), label_name, font=self.font_bold, fill=name_color_rgb)
-                            
+
                             # 거리 배경 및 텍스트
                             text_bbox = draw.textbbox((x1, y2 + 5), label_dist, font=self.font_bold)
-                            # draw.rectangle(text_bbox, fill=(200, 200, 200)) 
+                            # draw.rectangle(text_bbox, fill=(200, 200, 200))
                             draw.text((x1, y2 + 5), label_dist, font=self.font_bold, fill=(0, 0, 0))
                         else:
                             label = f"{simple_name} (추정:{box['sim_dist']:.1f}m)"
                             draw.text((x1, y1-25), label, font=self.font_bold, fill=(180, 180, 180))
-                    
+
                     # --- HUD 그리기 (투명도 70% 적용 & 위치 이동) ---
-                    
+
                     hud_text_list.sort()
-                    display_list = hud_text_list[:20] 
-                    
+                    display_list = hud_text_list[:20]
+
                     summary_text = " | ".join([f"{k.capitalize()}: {v}개" for k, v in total_counts.items()])
-                    
+
                     # 위치 조정 (y=10 -> y=50)
                     base_x = 10
-                    base_y = 50  
-                    
+                    base_y = 50
+
                     line_height = 20
-                    header_gap = 40   
+                    header_gap = 40
                     list_height = len(display_list) * line_height
                     summary_height = 40
-                    
+
                     total_box_height = header_gap + list_height + summary_height
-                    
-                    max_text_width = 300 
+
+                    max_text_width = 300
                     for txt in display_list:
                         w = draw.textlength(txt, font=self.font_bold)
                         if w > max_text_width: max_text_width = int(w)
                     w_sum = draw.textlength(summary_text, font=self.font_bold)
                     if w_sum > max_text_width: max_text_width = int(w_sum)
-                    
-                    box_width = max_text_width + 40 
-                    
+
+                    box_width = max_text_width + 40
+
                     # [수정] 반투명 검정 박스 (Alpha 180 ≈ 70%)
                     # (R, G, B, Alpha) -> (0, 0, 0, 180)
                     draw.rectangle(
-                        [(base_x, base_y), (base_x + box_width, base_y + total_box_height)], 
-                        fill=(0, 0, 0, 180) 
+                        [(base_x, base_y), (base_x + box_width, base_y + total_box_height)],
+                        fill=(0, 0, 0, 180)
                     )
-                    
+
                     # 텍스트 그리기 (텍스트는 불투명)
                     text_start_x = base_x + 10
                     text_start_y = base_y + 5
-                    
+
                     # 1. 내 위치
                     draw.text((text_start_x, text_start_y), f"내 위치: {self.player_pos[0]:.1f}, {self.player_pos[2]:.1f}", font=self.font_bold, fill=(0, 255, 0))
-                    
+
                     # 2. 리스트
                     for i, txt in enumerate(display_list):
                         draw.text((text_start_x, text_start_y + header_gap + i*line_height), txt, font=self.font_bold, fill=(200, 200, 200))
-                    
+
                     # 3. 총합
                     sum_y = text_start_y + header_gap + list_height + 10
                     draw.text((text_start_x, sum_y), summary_text, font=self.font_bold, fill=(255, 255, 0))
-                    
+
                     # [합성] 원본 이미지와 반투명 오버레이 합성
                     out = Image.alpha_composite(img_pil, overlay)
-                    
+
                     # 다시 OpenCV 포맷으로 변환 (RGBA -> RGB -> BGR)
                     frame = cv2.cvtColor(np.array(out.convert('RGB')), cv2.COLOR_RGB2BGR)
-                
+
                 cv2.imshow("Smart Map ID Tracker", frame)
                 if cv2.waitKey(1) & 0xFF == ord('q'): break
 
             except Exception as e:
                 print(f"Loop Error: {e}")
                 break
-        
+
         self.close()
 
     def close(self):
@@ -412,7 +412,7 @@ class ScreenDetector:
             pass
 
 if __name__ == "__main__":
-    MODEL_FILE_PATH = 'detector_gui/weights/5cls_v5_2_case2_best.pt' 
+    MODEL_FILE_PATH = 'detector_gui/weights/5cls_v5_2_case2_best.pt'
     detector = ScreenDetector(model_path=MODEL_FILE_PATH)
     detector.run_detection()
 
@@ -420,11 +420,11 @@ if __name__ == "__main__":
 #     app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
 
 # if __name__ == "__main__":
-#     MODEL_FILE_PATH = '5cls_v5_2_case2_best.pt' 
+#     MODEL_FILE_PATH = '5cls_v5_2_case2_best.pt'
 #     detector_instance = ScreenDetector(model_path=MODEL_FILE_PATH)
-    
+
 #     flask_thread = threading.Thread(target=run_flask)
 #     flask_thread.daemon = True
 #     flask_thread.start()
-    
+
 #     detector_instance.run_detection()
