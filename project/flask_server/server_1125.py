@@ -8,7 +8,7 @@ from flask import Flask, request, jsonify
 import math, os, time, json, heapq
 import numpy as np
 import pandas as pd
-from ultralytics import YOLO
+
 
 # ------------------------------------------------------------
 # 기본 설정
@@ -486,7 +486,21 @@ def info_get():
 @app.route('/detect', methods=['POST'])
 def detect(): return jsonify([]) 
 @app.route('/info', methods=['POST'])
-def info(): return jsonify({"status": "success"})
+def info():
+    global CURRENT_BODY_YAW
+    try:
+        # JSON 데이터 파싱
+        req = request.get_json(force=True) or {}
+        
+        # JSON 구조에서 바로 playerBodyX 추출
+        if "playerBodyX" in req:
+            CURRENT_BODY_YAW = float(req["playerBodyX"])
+            
+    except Exception as e:
+        print(f"Error processing info: {e}")
+        
+    return jsonify({"status": "success"})
+
 @app.route('/update_obstacle', methods=['POST'])
 def update_obstacle(): return jsonify({'status': 'success'})
 @app.route('/collision', methods=['POST'])
