@@ -82,6 +82,38 @@ def get_blocked_cells(obstacles):
 
 def heuristic(a, b):
     return math.hypot(a[0] - b[0], a[1] - b[1])
+def is_los_clear(p1, p2, blocked_cells):
+    x1, z1 = p1
+    x2, z2 = p2
+    dist = math.hypot(x2 - x1, z2 - z1)
+    if dist < GRID_SIZE: return True
+
+    # 0.5m 간격으로 샘플링하여 장애물 검사
+    steps = int(dist / (GRID_SIZE * 0.5))
+    for i in range(1, steps + 1):
+        t = i / steps
+        lx = x1 + (x2 - x1) * t
+        lz = z1 + (z2 - z1) * t
+        if world_to_grid(lx, lz) in blocked_cells:
+            return False
+    return True
+
+# 경로 평탄화 (불필요한 웨이포인트 제거)
+def smooth_path(path, blocked_cells):
+    if len(path) < 3: return path
+    
+    smoothed = [path[0]]
+    current_idx = 0
+    
+    while current_idx < len(path) - 1:
+        # 가장 멀리 있는 연결 가능한 노드를 찾음 (뒤에서부터 탐색)
+        for i in range(len(path) - 1, current_idx, -1):
+            if is_los_clear(path[current_idx], path[i], blocked_cells):
+                smoothed.append(path[i])
+                current_idx = i
+                break
+                
+    return smoothed
 
 def a_star_search(start_pos, end_pos, blocked_cells):
     start_node = world_to_grid(*start_pos)
@@ -143,7 +175,9 @@ def a_star_search(start_pos, end_pos, blocked_cells):
     path.append(start_pos)
     path.reverse()
     path.append(end_pos)
-    return path
+    if not path:
+        return []
+    return smooth_path(path, blocked_cells)
 
 # [전체 경로 생성]
 def generate_full_path(start_x, start_z):
@@ -401,7 +435,7 @@ def get_action():
             current_key_wp_index = 1
             return jsonify({"moveWS": {"command": "STOP", "weight": 1}, "fire": False})
         
-        target_x, target_z = get_lookahead_target_from_path(px, pz, 3.5)
+        target_x, target_z = get_lookahead_target_from_path(px, pz, 6.0)
 
     # CASE 1: Shoot & Scoot (후진 적용)
     elif current_key_wp_index == 1:
@@ -440,72 +474,7 @@ def get_action():
             
             target_x, target_z = get_lookahead_target_from_path(px, pz, 3.5)
 
-    # CASE 2+: 일반 주행
-    else:
-        if current_key_wp_index >= len(WAYPOINTS):
-            return jsonify({"moveWS": {"command": "STOP", "weight": 1}, "fire": False})
-        
-        wp_target = WAYPOINTS[current_key_wp_index]
-        dist = math.hypot(wp_target[0] - px, wp_target[1] - pz)
-        
-        # [수정] 도착하면 인덱스 올리고, 다음 경로 생성!
-        if dist < 3.5:
-            current_key_wp_index += 1
-            if current_key_wp_index < len(WAYPOINTS):
-                next_wp = WAYPOINTS[current_key_wp_index]
-                generate_temp_path(px, pz, next_wp[0], next_wp[1]) 
-                print(f"🚀 Generating Path to WP {current_key_wp_index}")
-        
-        target_x, target_z = get_lookahead_target_from_path(px, pz, 3.5)
-    # =========================================================
-    # [4] 모터 제어 (후진 로직 추가됨)
-    # =========================================================
-    dx, dz = target_x - px, target_z - pz
-    target_angle = math.degrees(math.atan2(dx, dz))
-
-    # ★★★ [핵심 변경] 후퇴 중일 때는 'S'키 로직 사용 ★★★
-    if IS_RETREATING:
-        # 내 엉덩이(Back)가 목표를 바라보는 각도 계산
-        back_yaw = normalize(body_yaw + 180.0)
-        diff = normalize(target_angle - back_yaw)
-        abs_diff = abs(diff)
-        
-        # [중요] 엉덩이 각도가 40도 이상 틀어져 있으면 -> 'S' 떼고 제자리 회전만!
-        if abs_diff > 40.0:
-            return jsonify({
-                "moveWS": {"command": "STOP", "weight": 1}, 
-                "moveAD": {"command": "D" if diff > 0 else "A", "weight": 0.8}, # 회전 속도 높임
-                "fire": False
-            })
-            
-        # 각도가 얼추 맞으면 -> 후진(S) 하면서 조향
-        else:
-            return jsonify({
-                "moveWS": {"command": "S", "weight": 0.5}, # 속도 조금 줄임 (안전하게)
-                "moveAD": {"command": "D" if diff > 0 else "A", "weight": min(1.0, abs_diff * 0.05)},
-                "fire": False
-            })
-
-    # 일반 전진 주행 (W키)
-    else:
-        diff = normalize(target_angle - body_yaw)
-        abs_diff = abs(diff)
-
-        if abs_diff > 60.0: # 각도가 너무 크면 제자리 회전
-            return jsonify({
-                "moveWS":   {"command": "STOP", "weight": 1},
-                "moveAD":   {"command": "D" if diff > 0 else "A", "weight": 0.5},
-                "fire":     False
-            })
-
-        fwd = min(0.6, max(0.3, 1.0 - (abs_diff / 60.0)))
-        return jsonify({
-            "moveWS":   {"command": "W", "weight": fwd},
-            "moveAD":   {"command": "D" if diff > 0 else "A", "weight": min(1.0, abs_diff * 0.04)},
-            "fire":     False
-        })
     
-
 # ------------------------------------------------------------
 # 8. 착탄 처리 (이벤트)
 # ------------------------------------------------------------
