@@ -17,7 +17,7 @@ app = Flask(__name__)
 
 # 파일 경로 (사용자 환경에 맞게 확인 필요)
 OUTPUT_CSV  = "log_data/output.csv"
-MAP_FILE    = "map/11_24_tuning.map"
+MAP_FILE    = "map/11_25.map"
 
 # ------------------------------------------------------------
 # WAYPOINT (주요 경유지)
