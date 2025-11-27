@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # ============================================================
 # [통합] A* Pathfinding + Pure Pursuit + Shoot & Scoot (Full)
 # ============================================================
@@ -149,6 +148,8 @@ def a_star_search(start_pos, end_pos, blocked_cells):
 # [전체 경로 생성]
 def generate_full_path(start_x, start_z):
     global FINAL_PATH, WAYPOINTS, ALL_OBSTACLES
+    sx = round(start_x / GRID_SIZE) * GRID_SIZE
+    sz = round(start_z / GRID_SIZE) * GRID_SIZE
     print("🗺️ Generating Initial Full Path...")
     blocked = get_blocked_cells(ALL_OBSTACLES)
     full_path = [(start_x, start_z)]
@@ -166,6 +167,8 @@ def generate_full_path(start_x, start_z):
 # [임시 경로 생성 - 후퇴/복귀용]
 def generate_temp_path(start_x, start_z, end_x, end_z):
     global FINAL_PATH, ALL_OBSTACLES
+    sx = round(start_x / GRID_SIZE) * GRID_SIZE
+    sz = round(start_z / GRID_SIZE) * GRID_SIZE
     print(f"🔄 Re-calculating Path: ({start_x:.1f}, {start_z:.1f}) -> ({end_x:.1f}, {end_z:.1f})")
     blocked = get_blocked_cells(ALL_OBSTACLES)
     path = a_star_search((start_x, start_z), (end_x, end_z), blocked)
@@ -450,7 +453,7 @@ def get_action():
             current_key_wp_index += 1
             if current_key_wp_index < len(WAYPOINTS):
                 next_wp = WAYPOINTS[current_key_wp_index]
-                generate_temp_path(px, pz, next_wp[0], next_wp[1]) # 다음 WP로 가는 길 뚫기
+                generate_temp_path(px, pz, next_wp[0], next_wp[1]) 
                 print(f"🚀 Generating Path to WP {current_key_wp_index}")
         
         target_x, target_z = get_lookahead_target_from_path(px, pz, 3.5)
