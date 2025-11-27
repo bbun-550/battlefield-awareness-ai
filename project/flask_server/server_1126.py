@@ -45,6 +45,8 @@ FIRE_COUNT = 0
 RECENTER_TURRET = False
 FIRE_AIM_START = None
 CURRENT_BODY_YAW = None
+LAST_FIRE_TIME = 0       # 마지막으로 발사한 시각
+RELOAD_COOLDOWN = 7.0    # GIF 시간과 동일하게 7초로 설정
 
 # 맵 정보 리스트 분리
 ALL_OBSTACLES = []  # 이동 방해물 (Tank, Car, Rock) -> A* 경로 계산용
@@ -282,7 +284,7 @@ def aim_good_enough(ex, ey): return abs(ex) < 3.0 and abs(ey) < 3.0
 # ------------------------------------------------------------
 # GET_ACTION (MAIN LOGIC)
 # ------------------------------------------------------------
-FIRST_FIRE_DELAY = 0.6 
+FIRST_FIRE_DELAY = 0.6
 
 @app.route("/get_action", methods=["POST"])
 def get_action():
@@ -318,9 +320,17 @@ def get_action():
 
         ctrl = turret_ctrl(tx, ty, sol["yaw"], sol["pitch"])
         fire = False
+
+        # 1. 조준이 정확한지 확인
         if aim_good_enough(ctrl["ex"], ctrl["ey"]):
             if FIRE_AIM_START is None: FIRE_AIM_START = time.time()
-            if time.time() - FIRE_AIM_START >= FIRST_FIRE_DELAY: fire = True
+
+            # 2. 조준 후 최소 대기시간(0.6초) 지남 AND 재장전 시간(7초) 지남 체크
+            time_since_aim = time.time() - FIRE_AIM_START
+            time_since_last_fire = time.time() - LAST_FIRE_TIME
+
+            if time_since_aim >= FIRST_FIRE_DELAY and time_since_last_fire >= RELOAD_COOLDOWN:
+                fire = True
         else:
             FIRE_AIM_START = None
 
@@ -439,11 +449,15 @@ def get_action():
 # ------------------------------------------------------------
 @app.route("/update_bullet", methods=["POST"])
 def update_bullet():
-    global FIRE_MODE, FIRE_COUNT, current_key_wp_index, RECENTER_TURRET, FIRE_AIM_START
+    global FIRE_MODE, FIRE_COUNT, current_key_wp_index, RECENTER_TURRET, FIRE_AIM_START, LAST_FIRE_TIME
     data = request.get_json(force=True) or {}
     if not FIRE_MODE: return jsonify({"status": "ignored"})
 
     FIRE_COUNT += 1
+
+    # 발사 성공 시점 기록 (이때부터 7초 카운트 시작)
+    LAST_FIRE_TIME = time.time()
+
     print(f"🔥 Fire Count: {FIRE_COUNT}/3")
 
     if FIRE_COUNT >= 3:
@@ -496,7 +510,8 @@ def info_get():
             "x":server_player_pos[0],
             "y":server_player_pos[1],
             "z":server_player_pos[2]
-        }
+        },
+        "fire_count": FIRE_COUNT
     })
 
 @app.route('/update_obstacle', methods=['POST'])
