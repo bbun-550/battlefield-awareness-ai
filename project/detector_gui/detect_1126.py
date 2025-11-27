@@ -20,6 +20,9 @@ class ScreenDetector:
         self.server_url = server_url
         self.player_pos = [0.0, 0.0, 0.0]
 
+        # 서버의 포격 카운트를 추적하기 위한 변수
+        self.last_fire_count = -1
+
         # 화면 해상도 설정 (기본 FHD)
         self.screen_width = 1920
         self.screen_height = 1080
@@ -75,11 +78,11 @@ class ScreenDetector:
         # ---------------------------------------------------------
         # [GIF 설정] Reload 애니메이션을 위한 변수 및 파일 로드
         # ---------------------------------------------------------
-        self.gif_path = "reload.gif"
+        self.gif_path = "detector_gui/image/reload.gif"
         self.gif_frames = []        # GIF 프레임들을 저장할 리스트
         self.is_reloading = False   # 현재 리로딩 중인지 상태 플래그
         self.reload_start_time = 0  # 리로딩 시작 시간
-        self.RELOAD_DURATION = 7.0  # 리로딩 지속 시간 (7초)
+        self.RELOAD_DURATION = 6.5  # 리로딩 지속 시간 (7초)
         
         self.load_gif_frames()      # GIF 미리 로드 실행
 
@@ -337,9 +340,9 @@ class ScreenDetector:
                     situation_text = self.analyze_battlefield(total_counts)
                     summary_text = " | ".join([f"{k.capitalize()}: {v}개" for k, v in total_counts.items()])
                     
-                    base_x, base_y = 5, 50  
+                    base_x, base_y = 5, 50
                     line_height = 25
-                    max_text_width = 300 
+                    max_text_width = 300
                     all_texts = ["전장상황인식", situation_text, summary_text] + display_list
                     
                     # HUD 박스 너비 자동 계산
@@ -365,20 +368,11 @@ class ScreenDetector:
                     draw.text((tx, ty_list+5), f'총합 : {summary_text}', font=self.font_bold, fill=(255, 255, 0))
 
                     # ---------------------------------------------------------
-                    # 8. GIF 오버레이 & 키보드 감지 로직
+                    # 8. GIF 오버레이
                     # ---------------------------------------------------------
-                    current_time = time.time()
-                    
-                    # [키 입력 체크] keyboard 모듈을 사용해 게임 중에도 스페이스바 감지
-                    if keyboard.is_pressed('space'):
-                        if not self.is_reloading:
-                            self.is_reloading = True
-                            self.reload_start_time = current_time
-                            print(">> Spacebar 감지! GIF 재생 시작")
-
                     # [GIF 그리기] 리로딩 상태일 때만 실행
                     if self.is_reloading:
-                        elapsed = current_time - self.reload_start_time
+                        elapsed = time.time() - self.reload_start_time
                         
                         if elapsed > self.RELOAD_DURATION:
                             self.is_reloading = False # 7초 지나면 종료
@@ -415,18 +409,40 @@ class ScreenDetector:
         cv2.destroyAllWindows()
 
     def update_player_pos_from_server(self):
-        """Flask 서버(server_1126.py)의 /info에서 플레이어 위치를 가져옴"""
+        """Flask 서버의 /info에서 플레이어 위치 및 포격 정보 가져오기"""
         try:
             resp = requests.get(f"{self.server_url}/info", timeout=0.2)
             if resp.status_code != 200:
                 return
+            
             data = resp.json()
+
+            # 1. 위치 정보 업데이트
             pos = data.get("pos")
             if isinstance(pos, dict):
                 x = float(pos.get("x", 0.0))
                 z = float(pos.get("z", 0.0))
                 # y는 시뮬레이터 상에서 크게 의미 없어서 0.0으로 고정
                 self.player_pos = [x, 0.0, z]
+
+            # 2. 포격(Fire) 감지 로직
+            current_fire_count = int(data.get("fire_count", 0))
+
+            # 처음 연결 시(-1)에는 현재 값으로 동기화만 하고 넘어감
+            if self.last_fire_count == -1:
+                self.last_fire_count = current_fire_count
+
+            # 카운트가 증가했다면 -> "발사됨" -> GIF 재생 시작
+            elif current_fire_count > self.last_fire_count:
+                # print(f">> 포격 감지! (Count: {self.last_fire_count} -> {current_fire_count}) GIF 재생")
+                self.is_reloading = True
+                self.reload_start_time = time.time()
+                self.last_fire_count = current_fire_count
+            
+            # 카운트가 초기화(0) 되었다면 추적 변수도 초기화
+            elif current_fire_count < self.last_fire_count:
+                self.last_fire_count = current_fire_count
+
         except Exception as e:
             # 서버 미응답 시 그냥 이전 위치 유지
             # print(f"[WARN] 서버에서 위치 받기 실패: {e}")
