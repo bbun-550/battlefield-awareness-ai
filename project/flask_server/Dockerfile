@@ -11,7 +11,7 @@ COPY map/ ./map/
 
 COPY log_data/ ./log_data/
 
-COPY server_1127.py .
+COPY server_1128.py .
 
 EXPOSE 5000
-CMD ["python", "server_1127.py"]
+CMD ["python", "server_1128.py"]
