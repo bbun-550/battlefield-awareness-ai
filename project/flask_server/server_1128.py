@@ -84,6 +84,39 @@ def get_blocked_cells(obstacles):
 def heuristic(a, b):
     return math.hypot(a[0] - b[0], a[1] - b[1])
 
+def is_los_clear(p1, p2, blocked_cells):
+    x1, z1 = p1
+    x2, z2 = p2
+    dist = math.hypot(x2 - x1, z2 - z1)
+    if dist < GRID_SIZE: return True
+
+    # 0.5m 간격으로 샘플링하여 장애물 검사
+    steps = int(dist / (GRID_SIZE * 0.5))
+    for i in range(1, steps + 1):
+        t = i / steps
+        lx = x1 + (x2 - x1) * t
+        lz = z1 + (z2 - z1) * t
+        if world_to_grid(lx, lz) in blocked_cells:
+            return False
+    return True
+
+# 경로 평탄화 (불필요한 웨이포인트 제거)
+def smooth_path(path, blocked_cells):
+    if len(path) < 3: return path
+    
+    smoothed = [path[0]]
+    current_idx = 0
+    
+    while current_idx < len(path) - 1:
+        # 가장 멀리 있는 연결 가능한 노드를 찾음 (뒤에서부터 탐색)
+        for i in range(len(path) - 1, current_idx, -1):
+            if is_los_clear(path[current_idx], path[i], blocked_cells):
+                smoothed.append(path[i])
+                current_idx = i
+                break
+                
+    return smoothed
+
 def a_star_search(start_pos, end_pos, blocked_cells):
     start_node = world_to_grid(*start_pos)
     end_node = world_to_grid(*end_pos)
@@ -144,7 +177,9 @@ def a_star_search(start_pos, end_pos, blocked_cells):
     path.append(start_pos)
     path.reverse()
     path.append(end_pos)
-    return path
+    if not path:
+        return []
+    return smooth_path(path, blocked_cells)
 
 # [전체 경로 생성]
 def generate_full_path(start_x, start_z):
@@ -419,7 +454,7 @@ def get_action():
             current_key_wp_index = 1
             return jsonify({"moveWS": {"command": "STOP", "weight": 1}, "fire": False})
         
-        target_x, target_z = get_lookahead_target_from_path(px, pz, 3.5)
+        target_x, target_z = get_lookahead_target_from_path(px, pz, 6.0)
 
     # CASE 1: Shoot & Scoot (후진 적용)
     elif current_key_wp_index == 1:
@@ -458,69 +493,120 @@ def get_action():
             
             target_x, target_z = get_lookahead_target_from_path(px, pz, 3.5)
 
-    # CASE 2+: 일반 주행
+    # ... (코드 상단 get_action 앞부분 생략) ...
+
+    # CASE 2+: 일반 주행 (코너링 최적화 적용)
     else:
         if current_key_wp_index >= len(WAYPOINTS):
             return jsonify({"moveWS": {"command": "STOP", "weight": 1}, "fire": False})
         
+        # -----------------------------------------------------------
+        # [A] 도착 판정 로직 (미리 도착했다고 치고 경로 꺾기)
+        # -----------------------------------------------------------
         wp_target = WAYPOINTS[current_key_wp_index]
         dist = math.hypot(wp_target[0] - px, wp_target[1] - pz)
         
-        # [수정] 도착하면 인덱스 올리고, 다음 경로 생성!
-        if dist < 3.5:
+        # 3번째 웨이포인트(인덱스 2)는 15m 전에서 미리 도착 처리 -> 부드럽게 원 그리기 시작
+        arrival_radius = 15.0 if current_key_wp_index == 2 else 3.5
+
+        if dist < arrival_radius:
+            print(f"✅ WP {current_key_wp_index} Passed (Dist: {dist:.1f}) -> Next")
             current_key_wp_index += 1
+            
             if current_key_wp_index < len(WAYPOINTS):
                 next_wp = WAYPOINTS[current_key_wp_index]
                 generate_temp_path(px, pz, next_wp[0], next_wp[1]) 
-                print(f"🚀 Generating Path to WP {current_key_wp_index}")
+                print(f"🚀 Smooth Switching to WP {current_key_wp_index}")
         
-        target_x, target_z = get_lookahead_target_from_path(px, pz, 3.5)
     # =========================================================
-    # [4] 모터 제어 (후진 로직 추가됨)
+    # [3.5] 주행 모드 판단 & Lookahead 설정
+    # =========================================================
+    # 사격 위치(WP 1)로 가는 중이거나, 쏘고 나서 복귀(Returning) 중인가? -> 정밀 모드 필요
+    is_combat_approach = (current_key_wp_index == 1) or IS_RETURNING
+
+    # [Lookahead 거리 조절]
+    # 전투 진입 시: 3.5m (짧게 잡아서 정확히 멈춤 -> 명중률 확보)
+    # 일반 주행 시: 6.0m (멀리 보고 부드럽게 주행 -> 승차감 확보)
+    lookahead_dist = 3.5 if is_combat_approach else 6.0
+    
+    target_x, target_z = get_lookahead_target_from_path(px, pz, lookahead_dist)
+
+    # =========================================================
+    # [4] 모터 제어 (정밀함과 부드러움 공존)
     # =========================================================
     dx, dz = target_x - px, target_z - pz
     target_angle = math.degrees(math.atan2(dx, dz))
 
-    # ★★★ [핵심 변경] 후퇴 중일 때는 'S'키 로직 사용 ★★★
+    # [A] 후퇴 (S키) - 기존 로직 유지
     if IS_RETREATING:
-        # 내 엉덩이(Back)가 목표를 바라보는 각도 계산
         back_yaw = normalize(body_yaw + 180.0)
-        diff = normalize(target_angle - back_yaw)
-        abs_diff = abs(diff)
-        
-        # [중요] 엉덩이 각도가 40도 이상 틀어져 있으면 -> 'S' 떼고 제자리 회전만!
-        if abs_diff > 40.0:
-            return jsonify({
-                "moveWS": {"command": "STOP", "weight": 1}, 
-                "moveAD": {"command": "D" if diff > 0 else "A", "weight": 0.8}, # 회전 속도 높임
-                "fire": False
-            })
-            
-        # 각도가 얼추 맞으면 -> 후진(S) 하면서 조향
+        back_diff = normalize(target_angle - back_yaw)
+        abs_back_diff = abs(back_diff)
+        if abs_back_diff > 40.0:
+            return jsonify({"moveWS": {"command": "STOP", "weight": 1}, "moveAD": {"command": "D" if back_diff > 0 else "A", "weight": 0.8}, "fire": False})
         else:
-            return jsonify({
-                "moveWS": {"command": "S", "weight": 0.5}, # 속도 조금 줄임 (안전하게)
-                "moveAD": {"command": "D" if diff > 0 else "A", "weight": min(1.0, abs_diff * 0.05)},
-                "fire": False
-            })
+            return jsonify({"moveWS": {"command": "S", "weight": 0.5}, "moveAD": {"command": "D" if back_diff > 0 else "A", "weight": min(1.0, abs_back_diff * 0.05)}, "fire": False})
 
-    # 일반 전진 주행 (W키)
+    # [B] 전진 (W키) - ★여기가 핵심★
     else:
         diff = normalize(target_angle - body_yaw)
         abs_diff = abs(diff)
 
-        if abs_diff > 60.0: # 각도가 너무 크면 제자리 회전
-            return jsonify({
-                "moveWS":   {"command": "STOP", "weight": 1},
-                "moveAD":   {"command": "D" if diff > 0 else "A", "weight": 0.5},
-                "fire":     False
-            })
+        # -------------------------------------------------------
+        # 상황별 주행 튜닝 (Drift vs Precision)
+        # -------------------------------------------------------
+        
+        # 1. 코너링 존 감지 (3번 웨이포인트 근처 20m)
+        corner_wp = WAYPOINTS[2]
+        dist_to_corner = math.hypot(corner_wp[0] - px, corner_wp[1] - pz)
+        is_hard_corner = (dist_to_corner < 20.0)
 
-        fwd = min(0.6, max(0.3, 1.0 - (abs_diff / 60.0)))
+        # 모드별 설정값 세팅
+        if is_combat_approach:
+            # [전투 모드] 정밀하게 움직여야 함 (사격 빗나감 방지)
+            pivot_limit = 55.0  # 각도 크면 멈춰서 정렬
+            min_throttle = 0.0  # 정지 가능
+            steer_gain = 0.04   # 핸들 적당히
+            drift_mode = False
+        
+        elif is_hard_corner:
+            # [드리프트 모드] 3번 코너링 (절대 멈추지 않음)
+            pivot_limit = 180.0 # 멈추지 마
+            min_throttle = 0.6  # 속도 유지 (강제 전진)
+            steer_gain = 0.06   # 핸들 팍팍 꺾음
+            drift_mode = True
+            print(f"🏎️ Drift Mode ON! (Speed fixed to 0.6)")
+            
+        else:
+            # [일반 주행] 적당히 부드럽게
+            pivot_limit = 120.0
+            min_throttle = 0.2
+            steer_gain = 0.04
+            drift_mode = False
+
+        # 2. 회전 판단 (Pivot Turn)
+        # 드리프트 모드일 땐 pivot_limit이 180이라 절대 안 걸림
+        if abs_diff > pivot_limit:
+            return jsonify({"moveWS": {"command": "STOP", "weight": 1}, "moveAD": {"command": "D" if diff > 0 else "A", "weight": 0.6}, "fire": False})
+
+        # 3. 조향 명령 (Steering)
+        steer_cmd = ""
+        steer_weight = 0.0
+        if abs_diff > 3.0:
+            steer_cmd = "D" if diff > 0 else "A"
+            steer_weight = min(1.0, abs_diff * steer_gain)
+
+        # 4. 속도 명령 (Throttle)
+        if drift_mode:
+            fwd = min_throttle # 0.6 고정 (감속 없음)
+        else:
+            # 일반/전투 모드는 각도에 따라 감속 (안전운전)
+            fwd = min(0.7, max(min_throttle, 1.0 - (abs_diff / 120.0)))
+
         return jsonify({
-            "moveWS":   {"command": "W", "weight": fwd},
-            "moveAD":   {"command": "D" if diff > 0 else "A", "weight": min(1.0, abs_diff * 0.04)},
-            "fire":     False
+            "moveWS": {"command": "W", "weight": fwd},
+            "moveAD": {"command": steer_cmd, "weight": steer_weight},
+            "fire": False
         })
     
 # ------------------------------------------------------------
