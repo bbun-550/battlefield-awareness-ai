@@ -146,7 +146,7 @@ class ScreenDetector:
             except: time.sleep(0.1)
 
     def run_detection(self):
-        print("🚀 [최종] TensorRT 실시간 모드 시작 (프레임 제한 해제)")
+        print(f"🚀 [최종] {self.model.ckpt_path} 모델로 실시간 모드 시작")
 
         CAR_FILTERS = ['car001', 'car002', 'car003', 'car004', 'car005']
         ROCK_FILTERS = ['rock001', 'rock002']
