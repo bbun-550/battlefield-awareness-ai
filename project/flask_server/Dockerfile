@@ -11,7 +11,7 @@ COPY map/ ./map/
 
 COPY log_data/ ./log_data/
 
-COPY server_modul/ ./server_modul/
+COPY server_module/ ./server_module/
 
 EXPOSE 5000
 CMD ["python", "server_modul/server.py"]
