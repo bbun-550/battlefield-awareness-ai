@@ -3,8 +3,16 @@ import pandas as pd
 import numpy as np
 
 class Gunner:
-    def __init__(self, map_file, csv_file="log_data/output.csv"):
-        # 탄도학 상수 (포탄 속도 58m/sm, 중력 9.81)
+    def __init__(self, map_file, csv_file="None"):
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+        
+        # csv_file 인자가 안 들어오면 기본 경로 설정
+        if csv_file is None:
+            self.csv_file = os.path.join(BASE_DIR, "log_data", "output.csv")
+        else:
+            self.csv_file = csv_file
+
+        # 탄도학 상수 (포탄 속도 58m/s, 중력 9.81)
         self.v_init = 58.0
         self.g = 9.81
         self.h_offset = 2.1 # 포탑이 바닥보다 2.1m 위에 있음
@@ -12,7 +20,6 @@ class Gunner:
         
         self.targets = []
         self._load_targets(map_file) # 적 위치 로딩
-        self.csv_file = csv_file     # 데이터 파일 경로
     
     # 맵 파일에서 tank 이름을 가진 적만 
     def _load_targets(self, map_file):

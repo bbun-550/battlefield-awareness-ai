@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-import math, time, logging
+import math, time, logging, os
 from combat import Gunner
 from navigation import Navigator
 
@@ -10,7 +10,9 @@ log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
 # --- 설정 및 전역 변수 ---
-MAP_FILE = "map/11_28.map"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+MAP_FILE = os.path.join(BASE_DIR, "map", "11_28.map")
 WAYPOINTS = [
     (66.08732, 45.9379), # (1번째 포인트) 
     (120.389, 181.441),  # (2번째 사격 포인트)   
