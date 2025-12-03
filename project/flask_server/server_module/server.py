@@ -10,9 +10,12 @@ log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
 # --- 설정 및 전역 변수 ---
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(CURRENT_DIR)
 
-MAP_FILE = os.path.join(BASE_DIR, "map", "11_28.map")
+# 3. 절대 경로 생성
+MAP_FILE = os.path.join(ROOT_DIR, "map", "11_28.map")
+CSV_FILE = os.path.join(ROOT_DIR, "log_data", "output.csv")
 WAYPOINTS = [
     (66.08732, 45.9379), # (1번째 포인트) 
     (120.389, 181.441),  # (2번째 사격 포인트)   

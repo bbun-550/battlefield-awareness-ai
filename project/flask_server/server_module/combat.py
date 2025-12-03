@@ -3,14 +3,9 @@ import pandas as pd
 import numpy as np
 
 class Gunner:
-    def __init__(self, map_file, csv_file="None"):
+    def __init__(self, map_file):
         BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-        
-        # csv_file 인자가 안 들어오면 기본 경로 설정
-        if csv_file is None:
-            self.csv_file = os.path.join(BASE_DIR, "log_data", "output.csv")
-        else:
-            self.csv_file = csv_file
+        self.csv_file = os.path.join(BASE_DIR, "log_data", "output.csv")
 
         # 탄도학 상수 (포탄 속도 58m/s, 중력 9.81)
         self.v_init = 58.0
@@ -23,7 +18,10 @@ class Gunner:
     
     # 맵 파일에서 tank 이름을 가진 적만 
     def _load_targets(self, map_file):
-        if not os.path.exists(map_file): return
+        if not os.path.exists(map_file): 
+            print("맵 파일을 찾을 수 없습니다. {map_file}")
+            return
+        
         with open(map_file, "r", encoding="utf-8") as f:
             data = json.load(f)
         for ob in data.get("obstacles", []):
@@ -84,8 +82,11 @@ class Gunner:
             angles = arr[:, 0]
             # np.interp 거리 55m면 50m와 60m 데이터 사이값으로 추정
             return float(np.interp(dist, z_vals, angles))
-        except: 
+        except Exception as e:
+            # 파일이 없거나 읽기 실패시 에러 출력
+            print(f"CSV 읽기 오류: {e} (경로: {self.csv_file})")
             return None
+        
     # 현재 각도와 목표 각도의 차이를 계산해서 Q,E,R,F 명령 
     def get_turret_control(self, curr_yaw, curr_pitch, target_yaw, target_pitch):
         def norm(a): return (a + 180.0) % 360.0 - 180.0
