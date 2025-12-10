@@ -11,13 +11,13 @@ class ObjectDetector:
         # ---------------------------------------------------------
         # 1. 하드웨어 가속 확인
         # ---------------------------------------------------------
-        # torch.cuda.is_available()을 통해 GPU 사용 가능 여부를 확인합니다.
+        # torch.cuda.is_available()을 통해 GPU 사용 가능 여부를 확인
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print(f"🖥️ [Vision] 하드웨어 가속 상태: {self.device.upper()}")
 
         self.model_path = model_path
         
-        # 환경에 맞는 모델(TensorRT 또는 ONNX)을 로드합니다.
+        # 환경에 맞는 모델(TensorRT 또는 ONNX)을 로드
         self.model = self._load_model()
         self.class_names = self.model.names
 
@@ -28,7 +28,7 @@ class ObjectDetector:
         self.FOCAL_LENGTH_PX = 1000
         
         # KNOWN_WIDTH_M: 각 클래스(객체)의 실제 물리적 가로 너비 (단위: 미터)
-        # 이 값을 기준으로 화면상 픽셀 크기와 비교해 거리를 추정합니다.
+        # 이 값을 기준으로 화면상 픽셀 크기와 비교해 거리를 추정
         self.KNOWN_WIDTH_M = {
             0: 1.6,   # 아군 (Blue)
             1: 14.4,  # 자동차 (Car)
