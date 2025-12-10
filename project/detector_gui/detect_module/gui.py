@@ -17,10 +17,10 @@ class Visualizer:
     def get_color(self, cls_name):
         """ 클래스 이름에 따라 고정된 색상(BGR) 반환 """
         n = cls_name.lower()
-        if n in ['red', 'tank']: return (0, 0, 255)     # 적군: 빨강
-        elif n == 'blue': return (255, 0, 0)            # 아군: 파랑
-        elif n in ['car', 'rock']: return (128, 128, 128) # 장애물: 회색
-        return (255, 255, 255)                          # 기타: 흰색
+        if n in ['red', 'tank']: return (0, 0, 255)         # 적군: 빨강
+        elif n == 'blue': return (255, 0, 0)                # 아군: 파랑
+        elif n in ['car', 'rock']: return (128, 128, 128)   # 장애물: 회색
+        return (255, 255, 255)                              # 기타: 흰색
 
     def trigger_reload(self):
         """ 
@@ -53,7 +53,7 @@ class Visualizer:
             # 매칭 성공 시: 실제 거리 / 실패 시: 시각적 추정 거리
             label_dist = f"{m_obj['real_dist']:.1f}m" if m_obj else f"({box['sim_dist']:.0f}m)"
 
-            # 가독성을 위해 텍스트 배경(검은색 박스) 추가
+            # 가독성을 위해 텍스트 배경 (검은색 박스) 추가
             cv2.rectangle(frame, (x1, y1-20), (x1+100, y1), color, -1)
             cv2.putText(frame, label_top, (x1+5, y1-5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2)
             cv2.putText(frame, label_dist, (x1, y2+20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,0), 2)

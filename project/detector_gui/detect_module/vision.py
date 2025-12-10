@@ -122,8 +122,8 @@ class ObjectDetector:
         
         detections = []
         for box in results[0].boxes:
-            x1, y1, x2, y2 = map(int, box.xyxy[0])   # 박스 좌표 추출
-            cls_id = int(box.cls[0])                 # 클래스 ID 추출
+            x1, y1, x2, y2 = map(int, box.xyxy[0])  # 박스 좌표 추출
+            cls_id = int(box.cls[0])                # 클래스 ID 추출
             cls_name = self.class_names.get(cls_id, 'unknown')
             
             # 시각적 거리 계산
