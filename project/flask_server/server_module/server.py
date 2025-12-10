@@ -200,6 +200,7 @@ def get_action():
                 # 2. 회전 완료 후 객체인식을 위해 3초 대기
             else:
                 # [3단계] 70도 회전까지 완료됨 -> 3초 대기 시작
+                # (이 부분은 else 안에 있어야 회전이 끝난 뒤에 실행됩니다)
                 
                 if wait_start_time is None: 
                     wait_start_time = time.time()

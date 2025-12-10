@@ -268,6 +268,6 @@ class ScreenDetector:
 
 if __name__ == "__main__":
     MODEL_FILE_PATH = 'detector_gui/weights/5cls_v7_case6_best.pt'
-    MAP_FILE_PATH = 'flask_server/map/11_28_notree.map'
+    MAP_FILE_PATH = 'flask_server/map/11_28.map'
     d = ScreenDetector(model_path=MODEL_FILE_PATH, map_path=MAP_FILE_PATH)
     d.run_detection()
