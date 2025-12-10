@@ -3,16 +3,16 @@ import math, os, json, heapq
 class Navigator:
     def __init__(self, map_file):
         self.map_file = map_file
-        self.grid_size = 1.0            # 지도를 1m 단위 격자로 쪼개기
-        self.obstacle_margin = 7.0      # 장애물로부터 7m 떨어지게 설정
-        self.obstacles = []             # 장애물 좌표 리스트
-        self.blocked_cells = set()      # 못 지나가는 격자를 표시
-        self.final_path = []            # 최종 계산된 경로
+        self.grid_size = 1.0        # 지도를 1m 단위 격자로 쪼개기
+        self.obstacle_margin = 7.0  # 장애물로부터 7m 떨어지게 설정
+        self.obstacles = []         # 장애물 좌표 리스트
+        self.blocked_cells = set()  # 못 지나가는 격자를 표시
+        self.final_path = []        # 최종 계산된 경로
         
-        self._load_map()                # 맵 파일을 읽어서 장애물 위치 파악
-        self._build_obstacle_map()      # 장애물 주변을 위험구역으로
+        self._load_map()            # 맵 파일을 읽어서 장애물 위치 파악
+        self._build_obstacle_map()  # 장애물 주변을 위험구역으로
 
-    def _load_map(self):    # json 파일에서 내가 지정한 값만 골라서 장애물로 등록
+    def _load_map(self): # json 파일에서 내가 지정한 값만 골라서 장애물로 등록
         if not os.path.exists(self.map_file): return
         with open(self.map_file, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -55,7 +55,7 @@ class Navigator:
         x1, z1 = p1; x2, z2 = p2
         dist = math.hypot(x2 - x1, z2 - z1)
         if dist < self.grid_size: 
-            return True     # 너무 가까우면 통과
+            return True # 너무 가까우면 통과
         
         # 0.5m 간격으로 점을 찍어가며 벽이 있는지 검사
         steps = int(dist / (self.grid_size * 0.5))
@@ -63,7 +63,7 @@ class Navigator:
             t = i / steps
             lx, lz = x1 + (x2 - x1) * t, z1 + (z2 - z1) * t
             if self._world_to_grid(lx, lz) in self.blocked_cells: 
-                return False    # 벿이 있을때
+                return False    # 벽이 있을때
         return True             # 벽이 없을때
 
     # [1단계] 경로를 직선으로 펴주기 (경로 평탄화)
@@ -109,7 +109,7 @@ class Navigator:
         neighbors = [(0,1),(0,-1),(1,0),(-1,0),(1,1),(1,-1),(-1,1),(-1,-1)]
 
         while open_set:
-            _, current = heapq.heappop(open_set)    # 가장 좋은 노드 꺼내기
+            _, current = heapq.heappop(open_set) # 가장 좋은 노드 꺼내기
             
             # 목표 지점 근처(2m)에 도착하면 종료
             if heuristic(current, end_node) < 2.0:
@@ -125,7 +125,7 @@ class Navigator:
             for dx, dy in neighbors:
                 neighbor = (current[0]+dx, current[1]+dy)
                 if neighbor in self.blocked_cells: 
-                    continue        # 장애물이면 패스
+                    continue # 장애물이면 패스
                 # 대각선 이동 시 장애물 긁기 방지
                 if dx!=0 and dy!=0:
                     if (current[0]+dx, current[1]) in self.blocked_cells or \

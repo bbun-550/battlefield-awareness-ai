@@ -209,3 +209,7 @@ __marimo__/
 # macOS system files
 .DS_Store
 */.DS_Store
+
+# Machine Learning model files to ignore
+*.onnx
+*.engine

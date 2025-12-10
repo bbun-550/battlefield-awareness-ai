@@ -8,7 +8,6 @@ import os
 import math
 from mss import mss
 
-# 모듈화된 파일 가져오기
 from detect_module import ObjectDetector, Visualizer
 
 class MainDetector:
@@ -19,7 +18,7 @@ class MainDetector:
     - 맵 데이터와 탐지 결과를 매칭함
     - gui에게 그리라고 시킴
     """
-    def __init__(self, model_path='best.pt', map_path='map.map'):
+    def __init__(self, model_path, map_path):
         # 1. 기본 변수 설정
         self.server_url = 'http://127.0.0.1:5000'
         self.player_pos = [0.0, 0.0, 0.0]
@@ -193,10 +192,9 @@ class MainDetector:
         cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    # 실행 설정: 모델 경로와 맵 파일 경로 지정
-    # 폴더 구조에 맞춰 경로를 수정하세요.
-    MODEL_PATH = 'detector_gui/weights/5cls_v7_case6_best.pt'
-    MAP_PATH = 'flask_server/map/11_28_notree.map'
+    # 모델 경로와 맵 파일 경로 지정
+    MODEL_PATH = 'detector_gui/weights/5cls_v7.pt'
+    MAP_PATH = 'flask_server/map/scenario_v4.map'
     
     app = MainDetector(model_path=MODEL_PATH, map_path=MAP_PATH)
     app.run()
