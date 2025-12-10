@@ -70,9 +70,9 @@ class Visualizer:
 
         # HUD 내용 출력
         cv2.putText(frame, "BATTLEFIELD STATUS", (15, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2)
-        cv2.putText(frame, f"My Pos: {player_pos[0]:.1f}, {player_pos[2]:.1f}", (15, 105), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 1)
-        cv2.putText(frame, f"Status: {sit_txt}", (15, 135), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100,100,255), 1)
-        cv2.putText(frame, f"Total: {summary}", (15, 165), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,255), 1)
+        cv2.putText(frame, f"[My Pos] {player_pos[0]:.1f}, {player_pos[2]:.1f}", (15, 105), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 1)
+        cv2.putText(frame, f"[Status] {sit_txt}", (15, 135), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100,100,255), 1)
+        cv2.putText(frame, f"[Total] {summary}", (15, 165), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,255), 1)
 
         # 3. 리로딩 알림 (GIF 제거 -> 텍스트 점멸)
         if self.is_reloading:

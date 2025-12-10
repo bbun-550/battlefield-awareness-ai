@@ -14,7 +14,7 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 
 # 절대 경로 생성
-MAP_FILE = os.path.join(ROOT_DIR, "map", "scenario_v3_bluesportscar.map")
+MAP_FILE = os.path.join(ROOT_DIR, "map", "scenario_v4.map")
 CSV_FILE = os.path.join(ROOT_DIR, "log_data", "output.csv")
 WAYPOINTS = [
     (110, 5),           # (1번째 포인트) 
@@ -427,4 +427,3 @@ def start(): return jsonify({"control": ""})
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
-    
