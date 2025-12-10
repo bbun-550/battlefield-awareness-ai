@@ -126,7 +126,7 @@ def get_action():
                 fire = True
                 total_shot_count += 1
                 last_fire_time = time.time()
-                print(f"🔥 발사! (누적: {total_shot_count}발)") # 중요 이벤트는 출력
+                print(f"발사! (누적: {total_shot_count}발)") # 중요 이벤트는 출력
         else:
             fire_aim_start = None   # 조준 풀리면 타이머 초기화
             
@@ -248,12 +248,12 @@ def get_action():
                     if elapsed < 3.0:
                         # 로그가 너무 많이 찍히지 않게 0.5초 단위로만 출력
                         if int(elapsed * 10) % 5 == 0:
-                            print(f"   ⏳ 대기 중... {elapsed:.1f}초 경과")
+                            print(f"대기 중... {elapsed:.1f}초 경과")
                         return jsonify({"moveWS": {"command": "STOP", "weight": 1}, "fire": False})
                     
                     # 3초 경과 -> 다음 단계로 전환 (여기가 문제의 지점)
                     else:
-                        print(f"✅ 3초 대기 종료! 다음 단계(Step {combat_step + 1}) 준비 중...")
+                        print(f"3초 대기 완료! 다음 단계(Step {combat_step + 1}) 준비 중...")
                         wait_start_time = None
                         combat_step += 1
                         
@@ -264,7 +264,7 @@ def get_action():
                         # 경로 생성 (여기서 에러가 날 확률이 높음)
                         nav.generate_path((px, pz), next_dest)
                         
-                        print(f"🚀 이동 명령 시작! (목표: {next_dest})")
+                        print(f"이동 명령 시작! (목표: {next_dest})")
                         return jsonify({"moveWS": {"command": "STOP", "weight": 1}, "fire": False})
 
                 # 목표 지점 도착 (2m 이내)
@@ -272,7 +272,7 @@ def get_action():
                     if next_action == "wait":
                         if wait_start_time is None:
                             wait_start_time = time.time()
-                            print(f"🛡️ 회피 지점 도착 -> 3초 대기 시작 (Step {combat_step})")
+                            print(f"회피 지점 도착 -> 3초 대기 시작 (Step {combat_step})")
                             return jsonify({"moveWS": {"command": "STOP", "weight": 1}, "fire": False})
 
                     elif next_action == "fire":
@@ -294,7 +294,7 @@ def get_action():
 
             except Exception as e:
                 # 에러가 발생해도 서버가 멈추지 않고 이유를 알려줌
-                print(f"🚨 [치명적 오류 발생] Step {combat_step} 처리 중 에러: {e}")
+                print(f"[치명적 오류 발생] Step {combat_step} 처리 중 에러: {e}")
                 import traceback
                 traceback.print_exc() # 자세한 에러 위치 출력
                 return jsonify({"moveWS": {"command": "STOP", "weight": 1}, "fire": False})
@@ -358,7 +358,7 @@ def update_bullet():
     if not is_fire_mode: return jsonify({"status": "ignored"})
     
     fire_count += 1
-    print(f"🎯 {fire_count}발 명중!")
+    print(f"{fire_count}발 명중!")
 
     # 3발 다 쐈으면 미션 클리어 -> 다음 WP로 이동
     if fire_count >= 3:
@@ -371,7 +371,7 @@ def update_bullet():
         if current_key_wp_index < len(WAYPOINTS):
             nav.generate_path((server_player_pos[0], server_player_pos[2]), WAYPOINTS[current_key_wp_index])
         
-        print("✅ 구역 클리어 -> 다음 웨이포인트로 이동")
+        print("구역 클리어 -> 다음 웨이포인트로 이동")
         return jsonify({"status": "done"})
     
     # 1발 또는 2발 명중 시 -> 다음 시퀀스(회피 기동)로 전환
@@ -390,7 +390,7 @@ def update_bullet():
         nav.generate_path((server_player_pos[0], server_player_pos[2]), dest)
         
         method_str = "전진" if next_order["method"] == "forward" else "후 진"
-        print(f"🚀 {fire_count}차 사격 완료 -> {dest}로 {method_str} 회피 기동 시작")
+        print(f"{fire_count}차 사격 완료 -> {dest}로 {method_str} 회피 기동 시작")
         
         return jsonify({"status": "moving_next"})
 
