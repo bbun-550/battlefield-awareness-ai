@@ -5,21 +5,21 @@ from navigation import Navigator
 
 app = Flask(__name__)
 
-# 붛필요한 로그를 없애기 
+# 불필요한 로그를 없애기 
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
-# --- 설정 및 전역 변수 ---
+# 설정 및 전역 변수
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 
-# 3. 절대 경로 생성
-MAP_FILE = os.path.join(ROOT_DIR, "map", "12_06_obstacle_v3_bluesportscar.map")
+# 절대 경로 생성
+MAP_FILE = os.path.join(ROOT_DIR, "map", "scenario_v4.map")
 CSV_FILE = os.path.join(ROOT_DIR, "log_data", "output.csv")
 WAYPOINTS = [
-    (110, 5), # (1번째 포인트) 
-    (120.389, 173.8),  # (2번째 사격 포인트)   
-    (81.959, 273.179),    # (3번째 코너 포인트)
+    (110, 5),           # (1번째 포인트) 
+    (120.389, 173.8),   # (2번째 사격 포인트)   
+    (81.959, 273.179),  # (3번째 코너 포인트)
 ]
 
 COMBAT_SEQUENCE = [
@@ -30,7 +30,7 @@ COMBAT_SEQUENCE = [
     {"pos": (117.6, 175.7), "method": "backward", "action": "fire"}
 ]
 
-# [신규] 현재 전투 단계 추적 변수 (0:도착, 1:회피이동, 2:공격이동, 3:회피이동, 4:공격이동)
+# 현재 전투 단계 추적 변수 (0:도착, 1:회피이동, 2:공격이동, 3:회피이동, 4:공격이동)
 combat_step = 0
 
 # 상태 변수
@@ -57,7 +57,7 @@ last_print_time = 0
 # 모듈 인스턴스 생성
 gunner = Gunner(MAP_FILE)
 nav = Navigator(MAP_FILE)
-path_generated = False      # 전체 경로가 생성되었는지 확인
+path_generated = False # 전체 경로가 생성되었는지 확인
 
 # 각도를 -180~180도 사이로 변환해주는 함수
 def normalize(a): return (a + 180.0) % 360.0 - 180.0
@@ -128,7 +128,7 @@ def get_action():
                 last_fire_time = time.time()
                 print(f"발사! (누적: {total_shot_count}발)") # 중요 이벤트는 출력
         else:
-            fire_aim_start = None   # 조준 풀리면 타이머 초기화
+            fire_aim_start = None # 조준 풀리면 타이머 초기화
             
         return jsonify({
             "moveWS": {"command": "STOP", "weight": 1}, "moveAD": {"command": "", "weight": 0},
@@ -139,17 +139,17 @@ def get_action():
     # [B] 포탑 정렬 (포탑 복귀)
     if recenter_turret:
         yaw_err = normalize(body_yaw - tx)
-        if abs(yaw_err) > 3.0:      # 오차가 3도 이상이면 회전
+        if abs(yaw_err) > 3.0: # 오차가 3도 이상이면 회전
             return jsonify({
                 "moveWS": {"command": "STOP", "weight": 1}, "moveAD": {"command": "", "weight": 0},
                 "turretQE": {"command": "E" if yaw_err > 0 else "Q", "weight": 0.3}, "fire": False
             })
-        recenter_turret = False     # 정렬 완료되면 종료
+        recenter_turret = False # 정렬 완료되면 종료
 
     # ---------------------------------------------------------
     # [C] 주행 시나리오 (위치에 따라 행동 결정)
     drift_mode = False
-    is_combat_approach = (current_key_wp_index == 1) or is_returning    # 전투 지역 진입 여부
+    is_combat_approach = (current_key_wp_index == 1) or is_returning # 전투 지역 진입 여부
     
     if current_key_wp_index < len(WAYPOINTS):
         target_x, target_z = WAYPOINTS[current_key_wp_index]
@@ -187,8 +187,8 @@ def get_action():
                     
                     # 3초 지남 -> 1단계 완료 처리
                     else:
-                        has_faced_290 = True       # 1단계 완료 플래그
-                        wait_start_time = None     # 타이머 리셋 (다음 단계를 위해 필수)
+                        has_faced_290 = True    # 1단계 완료 플래그
+                        wait_start_time = None  # 타이머 리셋 (다음 단계를 위해 필수)
                         print("3초 대기 끝 -> 2차 회전 시작")
             
             # [2단계] 1단계가 끝났으므로 -> 70도 조준
@@ -200,6 +200,7 @@ def get_action():
                 # 2. 회전 완료 후 객체인식을 위해 3초 대기
             else:
                 # [3단계] 70도 회전까지 완료됨 -> 3초 대기 시작
+                # (이 부분은 else 안에 있어야 회전이 끝난 뒤에 실행됩니다)
                 
                 if wait_start_time is None: 
                     wait_start_time = time.time()
@@ -362,9 +363,9 @@ def update_bullet():
     # 3발 다 쐈으면 미션 클리어 -> 다음 WP로 이동
     if fire_count >= 3:
         is_fire_mode = False
-        combat_step = 0  # 초기화
+        combat_step = 0             # 초기화
         current_key_wp_index += 1
-        recenter_turret = True # 포탑 정렬 요청
+        recenter_turret = True      # 포탑 정렬 요청
         
         # 다음 경로 생성
         if current_key_wp_index < len(WAYPOINTS):
@@ -399,7 +400,7 @@ def update_bullet():
 @app.route('/info', methods=['POST', 'GET'])
 def info():
     global server_player_pos, current_body_yaw
-    if request.method == 'POST':    # 내 위치 업데이트
+    if request.method == 'POST': # 내 위치 업데이트
         try:
             data = request.get_json(force=True) or {}
             if "playerBodyX" in data: current_body_yaw = float(data["playerBodyX"])
@@ -407,7 +408,7 @@ def info():
             server_player_pos = [float(pos.get('x',0)), float(pos.get('y',0)), float(pos.get('z',0))]
             return "OK", 200
         except: return "Error", 400
-    else:   # 현재 상태 조회
+    else: # 현재 상태 조회
         return jsonify({"pos": {"x":server_player_pos[0], "y":server_player_pos[1], "z":server_player_pos[2]}, "fire_count": total_shot_count})
 
 @app.route('/update_obstacle', methods=['POST'])

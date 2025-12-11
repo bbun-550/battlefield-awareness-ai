@@ -10,11 +10,11 @@ class Gunner:
         # 탄도학 상수 (포탄 속도 58m/s, 중력 9.81)
         self.v_init = 58.0
         self.g = 9.81
-        self.h_offset = 2.1 # 포탑이 바닥보다 2.1m 위에 있음
-        self.max_range = 130.0 # 최대 사거리 제한
-        
+        self.h_offset = 2.1             # 포탑이 바닥보다 2.1m 위에 있음
+        self.max_range = 130.0          # 최대 사거리 제한
+
         self.targets = []
-        self._load_targets(map_file) # 적 위치 로딩
+        self._load_targets(map_file)    # 적 위치 로딩
     
     # 맵 파일에서 tank 이름을 가진 적만 
     def _load_targets(self, map_file):
@@ -65,7 +65,7 @@ class Gunner:
         # 해가 없으면
         else:
             pitch = self._get_pitch_from_csv(math.hypot(dx, dy, dz))
-            if pitch is None: # CSV도 없으면 그냥 적을 바라보게(직사)
+            if pitch is None: # CSV도 없으면 그냥 적을 바라보게 (직사)
                 pitch = math.degrees(math.atan2(dy, dist_h))
         
         return {"ok": True, "yaw": yaw, "pitch": max(-30.0, min(10.0, pitch))}
@@ -97,8 +97,8 @@ class Gunner:
         
         return {
             # 오차가 클수록 속도를 1.0으로, 작으면 천천히
-            "turretQE": {"command": cmd_y, "weight": min(abs(dyaw)*0.05, 1.0)},
+            "turretQE": {"command": cmd_y, "weight": min(abs(dyaw)*0.02, 1.0)},
             "turretRF": {"command": cmd_p, "weight": min(abs(dpitch)*0.2, 1.0)},
-            "aimed": abs(dyaw) < 3.0 and abs(dpitch) < 3.0      # 오차가 3도 미만이면 조준 완료 판정
+            "aimed": abs(dyaw) < 3.0 and abs(dpitch) < 3.0 # 오차가 3도 미만이면 조준 완료 판정
         }
     
