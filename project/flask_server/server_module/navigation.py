@@ -192,7 +192,8 @@ class Navigator:
         # 조향 명령 
         steer_cmd = "D" if diff > 0 else "A" if abs_diff > 3.0 else ""
         steer_weight = min(1.0, abs_diff * steer_gain) if steer_cmd else 0.0
-        #가속 명령
-        fwd = min_throttle if drift_mode else min(0.7, max(min_throttle, 1.0 - (abs_diff / 120.0)))
+        # 수정 예시 (최고 속도 0.5로 제한)
+        max_speed = 0.5  # 원하는 제한 속도 설정
+        fwd = min_throttle if drift_mode else min(max_speed, max(min_throttle, 1.0 - (abs_diff / 120.0)))
         
         return {"moveWS": {"command": "W", "weight": fwd}, "moveAD": {"command": steer_cmd, "weight": steer_weight}}
