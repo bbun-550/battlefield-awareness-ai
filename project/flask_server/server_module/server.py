@@ -14,7 +14,7 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 
 # 절대 경로 생성
-MAP_FILE = os.path.join(ROOT_DIR, "map", "scenario_v4.map")
+MAP_FILE = os.path.join(ROOT_DIR, "map", "scenario_v5.map")
 CSV_FILE = os.path.join(ROOT_DIR, "log_data", "output.csv")
 WAYPOINTS = [
     (110, 5),           # (1번째 포인트) 
@@ -142,7 +142,7 @@ def get_action():
         if abs(yaw_err) > 3.0: # 오차가 3도 이상이면 회전
             return jsonify({
                 "moveWS": {"command": "STOP", "weight": 1}, "moveAD": {"command": "", "weight": 0},
-                "turretQE": {"command": "E" if yaw_err > 0 else "Q", "weight": 0.3}, "fire": False
+                "turretQE": {"command": "E" if yaw_err > 0 else "Q", "weight": 0.2}, "fire": False
             })
         recenter_turret = False # 정렬 완료되면 종료
 
@@ -174,7 +174,7 @@ def get_action():
                 if abs(diff) > 4.0:
                     return jsonify({"moveWS": {"command": "STOP", "weight": 1}, 
                                     "moveAD": {"command": "", "weight": 0}, 
-                                    "turretQE": {"command": "E" if diff > 0 else "Q", "weight": 0.3}, "fire": False})
+                                    "turretQE": {"command": "E" if diff > 0 else "Q", "weight": 0.2}, "fire": False})
                 else:
                     if wait_start_time is None: 
                         wait_start_time = time.time()
@@ -196,7 +196,7 @@ def get_action():
             diff = normalize(target_rot - tx)
         
             if abs(diff) > 4.0:
-                return jsonify({"moveWS": {"command": "STOP", "weight": 1}, "moveAD": {"command": "", "weight": 0}, "turretQE": {"command": "E" if diff > 0 else "Q", "weight": 0.3}, "fire": False})
+                return jsonify({"moveWS": {"command": "STOP", "weight": 1}, "moveAD": {"command": "", "weight": 0}, "turretQE": {"command": "E" if diff > 0 else "Q", "weight": 0.2}, "fire": False})
                 # 2. 회전 완료 후 객체인식을 위해 3초 대기
             else:
                 # [3단계] 70도 회전까지 완료됨 -> 3초 대기 시작
@@ -310,6 +310,7 @@ def get_action():
                 turn_cmd = "D" if yaw_diff > 0 else "A"
                 print(f"최종 도착 -> 90도 정렬 중 (현재: {body_yaw:.1f})")
                 return jsonify({
+
                     "moveWS": {"command": "STOP", "weight": 1}, 
                     "moveAD": {"command": turn_cmd, "weight": 0.8}, # 회전 속도 조절 필요 시 weight 변경
                     "fire": False

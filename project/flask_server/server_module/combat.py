@@ -98,7 +98,7 @@ class Gunner:
         return {
             # 오차가 클수록 속도를 1.0으로, 작으면 천천히
             "turretQE": {"command": cmd_y, "weight": min(abs(dyaw)*0.02, 1.0)},
-            "turretRF": {"command": cmd_p, "weight": min(abs(dpitch)*0.2, 1.0)},
+            "turretRF": {"command": cmd_p, "weight": min(abs(dpitch)*0.1, 1.0)},
             "aimed": abs(dyaw) < 3.0 and abs(dpitch) < 3.0 # 오차가 3도 미만이면 조준 완료 판정
         }
     

@@ -194,7 +194,7 @@ class MainDetector:
 if __name__ == "__main__":
     # 모델 경로와 맵 파일 경로 지정
     MODEL_PATH = 'detector_gui/weights/5cls_v7.pt'
-    MAP_PATH = 'flask_server/map/scenario_v4.map'
+    MAP_PATH = 'flask_server/map/scenario_v5.map'
     
     app = MainDetector(model_path=MODEL_PATH, map_path=MAP_PATH)
     app.run()
