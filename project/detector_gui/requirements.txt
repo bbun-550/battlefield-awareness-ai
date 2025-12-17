@@ -8,3 +8,4 @@ torchvision==0.17.2
 requests==2.31.0
 tensorrt==10.14.1.48.post1
 onnxruntime==1.23.2
+0aa067a (rebase main)
