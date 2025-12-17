@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+python-multipart
+numpy
+opencv-python
+torch
+ultralytics
+google-generativeai
+pydantic
